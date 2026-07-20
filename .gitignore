@@ -1,0 +1,40 @@
+# Environnements Python
+.venv/
+venv/
+env/
+
+# Fichiers temporaires Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Fichiers Django générés localement
+*.sqlite3
+media/
+staticfiles/
+
+# Dépendances et fichiers générés par Vue.js
+node_modules/
+dist/
+.vite/
+coverage/
+
+# Variables d'environnement et secrets
+.env
+.env.*
+!.env.example
+
+# Journaux
+*.log
+
+# Configuration locale des éditeurs
+.vscode/
+.idea/
+
+# Fichiers générés par Windows et macOS
+Thumbs.db
+Desktop.ini
+.DS_Store
