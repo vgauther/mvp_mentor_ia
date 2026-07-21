@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "corsheaders",
+    "api",
 ]
 
 
@@ -125,3 +126,18 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS")
+
+KEYCLOAK_ISSUER = env("KEYCLOAK_ISSUER").rstrip("/")
+KEYCLOAK_AUDIENCE = env("KEYCLOAK_AUDIENCE")
+KEYCLOAK_JWKS_URL = (
+    f"{KEYCLOAK_ISSUER}/protocol/openid-connect/certs"
+)
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "api.authentication.KeycloakAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+}
