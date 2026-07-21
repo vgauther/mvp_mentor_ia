@@ -52,7 +52,7 @@ services:
     image: quay.io/keycloak/keycloak:26.7.0
     container_name: le-bon-prenom-keycloak
     restart: unless-stopped
-    command: start-dev
+    command: start-dev --import-realm
 
     environment:
       KC_DB: postgres
@@ -67,6 +67,9 @@ services:
 
     ports:
       - "127.0.0.1:8080:8080"
+
+    volumes:
+      - ./keycloak/import:/opt/keycloak/data/import:ro
 
     depends_on:
       keycloak-postgres:
