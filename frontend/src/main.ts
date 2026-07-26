@@ -1,12 +1,27 @@
-import { createApp } from 'vue'
+﻿import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 
 import App from './App.vue'
-import router from './router'
+import keycloak from './auth/keycloak'
 
-const app = createApp(App)
+async function bootstrap() {
+  try {
+    await keycloak.init({
+      onLoad: 'login-required',
+      pkceMethod: 'S256',
+    })
 
-app.use(createPinia())
-app.use(router)
+    const { default: router } = await import('./router')
 
-app.mount('#app')
+    const app = createApp(App)
+
+    app.use(createPinia())
+    app.use(router)
+
+    app.mount('#app')
+  } catch (error) {
+    console.error("Échec de l'initialisation de Keycloak :", error)
+  }
+}
+
+void bootstrap()
