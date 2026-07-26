@@ -1,14 +1,62 @@
 ﻿<script setup lang="ts">
+import { onMounted, ref } from 'vue'
+
 import keycloak from './auth/keycloak'
 
-const username = keycloak.tokenParsed?.preferred_username ?? 'Utilisateur'
-const email = keycloak.tokenParsed?.email
+interface ApiUser {
+  id: string
+  username: string
+  email: string | null
+  roles: string[]
+}
+
+const user = ref<ApiUser | null>(null)
+const isLoading = ref(true)
+const errorMessage = ref('')
+
+async function loadUser() {
+  try {
+    await keycloak.updateToken(30)
+
+    if (!keycloak.token) {
+      throw new Error('Aucun jeton Keycloak disponible.')
+    }
+
+    const response = await fetch(
+      `${import.meta.env.VITE_API_URL}/api/me/`,
+      {
+        headers: {
+          Authorization: `Bearer ${keycloak.token}`,
+        },
+      },
+    )
+
+    if (!response.ok) {
+      throw new Error(`Réponse Django : ${response.status}`)
+    }
+
+    user.value = await response.json() as ApiUser
+  } catch (error) {
+    console.error(
+      "Échec de la récupération de l'utilisateur :",
+      error,
+    )
+    errorMessage.value =
+      "Impossible de vérifier votre identité auprès de Django."
+  } finally {
+    isLoading.value = false
+  }
+}
 
 async function logout() {
   await keycloak.logout({
     redirectUri: window.location.origin,
   })
 }
+
+onMounted(() => {
+  void loadUser()
+})
 </script>
 
 <template>
@@ -16,11 +64,24 @@ async function logout() {
     <h1>Le Bon Prénom</h1>
 
     <section>
-      <h2>Bienvenue {{ username }}</h2>
-      <p v-if="email">Adresse e-mail : {{ email }}</p>
-      <p>Vous êtes connecté avec Keycloak.</p>
+      <p v-if="isLoading">
+        Vérification de votre identité...
+      </p>
 
-      <button type="button" @click="logout">Se déconnecter</button>
+      <p v-else-if="errorMessage" role="alert">
+        {{ errorMessage }}
+      </p>
+
+      <template v-else-if="user">
+        <h2>Bienvenue {{ user.username }}</h2>
+        <p v-if="user.email">Adresse e-mail : {{ user.email }}</p>
+        <p>Votre identité a été validée par Django.</p>
+        <p>Rôles : {{ user.roles.join(', ') || 'aucun' }}</p>
+      </template>
+
+      <button type="button" @click="logout">
+        Se déconnecter
+      </button>
     </section>
   </main>
 </template>
