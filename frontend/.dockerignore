@@ -1,0 +1,17 @@
+node_modules
+dist
+
+.env
+.env.local
+.env.*.local
+
+.git
+.gitignore
+.vscode
+
+e2e
+playwright-report
+test-results
+
+npm-debug.log*
+.eslintcache
