@@ -11,6 +11,8 @@ from rest_framework.authentication import (
 )
 from rest_framework.exceptions import AuthenticationFailed
 
+from .models import Profile
+
 
 jwks_client = PyJWKClient(settings.KEYCLOAK_JWKS_URL)
 
@@ -22,6 +24,7 @@ class KeycloakUser:
     email: str | None
     roles: frozenset[str]
     claims: dict[str, Any]
+    profile: Profile
 
     @property
     def pk(self) -> str:
@@ -42,6 +45,41 @@ class KeycloakUser:
     @property
     def is_superuser(self) -> bool:
         return "admin" in self.roles
+
+
+def get_or_sync_profile(
+    *,
+    keycloak_id: str,
+    username: str,
+    email: str | None,
+) -> Profile:
+    profile, _ = Profile.objects.get_or_create(
+        keycloak_id=keycloak_id,
+        defaults={
+            "username": username,
+            "email": email,
+        },
+    )
+
+    changed_fields = []
+
+    if profile.username != username:
+        profile.username = username
+        changed_fields.append("username")
+
+    if profile.email != email:
+        profile.email = email
+        changed_fields.append("email")
+
+    if changed_fields:
+        profile.save(
+            update_fields=[
+                *changed_fields,
+                "updated_at",
+            ]
+        )
+
+    return profile
 
 
 class KeycloakAuthentication(BaseAuthentication):
@@ -95,15 +133,22 @@ class KeycloakAuthentication(BaseAuthentication):
         realm_access = claims.get("realm_access", {})
         roles = frozenset(realm_access.get("roles", []))
 
+        username = claims.get("preferred_username") or claims["sub"]
+        email = claims.get("email") or None
+
+        profile = get_or_sync_profile(
+            keycloak_id=claims["sub"],
+            username=username,
+            email=email,
+        )
+
         user = KeycloakUser(
             id=claims["sub"],
-            username=claims.get(
-                "preferred_username",
-                claims["sub"],
-            ),
-            email=claims.get("email"),
+            username=username,
+            email=email,
             roles=roles,
             claims=claims,
+            profile=profile,
         )
 
         return user, claims
