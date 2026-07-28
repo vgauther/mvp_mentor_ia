@@ -151,3 +151,49 @@ class NameSearchParticipant(models.Model):
 
     def __str__(self) -> str:
         return f"{self.profile} — {self.search}"
+
+class NameDecision(models.Model):
+    class Choice(models.TextChoices):
+        LIKED = "liked", "Aimé"
+        REJECTED = "rejected", "Refusé"
+
+    participant = models.ForeignKey(
+        NameSearchParticipant,
+        on_delete=models.CASCADE,
+        related_name="decisions",
+    )
+    first_name = models.ForeignKey(
+        FirstName,
+        on_delete=models.CASCADE,
+        related_name="decisions",
+    )
+    choice = models.CharField(
+        max_length=8,
+        choices=Choice.choices,
+        db_index=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-updated_at",)
+        verbose_name = "décision sur un prénom"
+        verbose_name_plural = "décisions sur les prénoms"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("participant", "first_name"),
+                name="unique_participant_first_name",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("participant", "choice"),
+                name="decision_part_choice_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return (
+            f"{self.participant.profile} — "
+            f"{self.first_name}: {self.get_choice_display()}"
+        )

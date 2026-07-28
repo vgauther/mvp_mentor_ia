@@ -2,11 +2,11 @@ from django.contrib import admin
 
 from .models import (
     FirstName,
+    NameDecision,
     NameSearch,
     NameSearchParticipant,
     Profile,
 )
-
 
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
@@ -104,6 +104,36 @@ class NameSearchParticipantAdmin(admin.ModelAdmin):
         "profile",
     )
     ordering = ("-created_at",)
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+    )
+
+@admin.register(NameDecision)
+class NameDecisionAdmin(admin.ModelAdmin):
+    list_display = (
+        "first_name",
+        "participant",
+        "choice",
+        "created_at",
+        "updated_at",
+    )
+    list_filter = (
+        "choice",
+        "participant__search",
+        "created_at",
+    )
+    search_fields = (
+        "first_name__name",
+        "participant__profile__username",
+        "participant__profile__display_name",
+        "participant__search__title",
+    )
+    autocomplete_fields = (
+        "participant",
+        "first_name",
+    )
+    ordering = ("-updated_at",)
     readonly_fields = (
         "created_at",
         "updated_at",
