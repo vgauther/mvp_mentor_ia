@@ -1,6 +1,11 @@
 from django.contrib import admin
 
-from .models import FirstName, NameSearch, Profile
+from .models import (
+    FirstName,
+    NameSearch,
+    NameSearchParticipant,
+    Profile,
+)
 
 
 @admin.register(Profile)
@@ -68,6 +73,36 @@ class NameSearchAdmin(admin.ModelAdmin):
         "creator__email",
     )
     autocomplete_fields = ("creator",)
+    ordering = ("-created_at",)
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+    )
+
+@admin.register(NameSearchParticipant)
+class NameSearchParticipantAdmin(admin.ModelAdmin):
+    list_display = (
+        "profile",
+        "search",
+        "role",
+        "invitation_status",
+        "created_at",
+    )
+    list_filter = (
+        "role",
+        "invitation_status",
+        "created_at",
+    )
+    search_fields = (
+        "search__title",
+        "profile__username",
+        "profile__display_name",
+        "profile__email",
+    )
+    autocomplete_fields = (
+        "search",
+        "profile",
+    )
     ordering = ("-created_at",)
     readonly_fields = (
         "created_at",

@@ -97,3 +97,57 @@ class NameSearch(models.Model):
 
     def __str__(self) -> str:
         return self.title
+
+class NameSearchParticipant(models.Model):
+    class Role(models.TextChoices):
+        OWNER = "owner", "Propriétaire"
+        MEMBER = "member", "Participant"
+
+    class InvitationStatus(models.TextChoices):
+        PENDING = "pending", "En attente"
+        ACCEPTED = "accepted", "Acceptée"
+        DECLINED = "declined", "Refusée"
+
+    search = models.ForeignKey(
+        NameSearch,
+        on_delete=models.CASCADE,
+        related_name="participants",
+    )
+    profile = models.ForeignKey(
+        Profile,
+        on_delete=models.CASCADE,
+        related_name="search_participations",
+    )
+    role = models.CharField(
+        max_length=10,
+        choices=Role.choices,
+        default=Role.MEMBER,
+    )
+    invitation_status = models.CharField(
+        max_length=10,
+        choices=InvitationStatus.choices,
+        default=InvitationStatus.PENDING,
+        db_index=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("created_at",)
+        verbose_name = "participant à une recherche"
+        verbose_name_plural = "participants aux recherches"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("search", "profile"),
+                name="unique_search_participant",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("profile", "invitation_status"),
+                name="participant_invite_status_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.profile} — {self.search}"
