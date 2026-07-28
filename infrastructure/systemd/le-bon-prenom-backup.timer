@@ -1,0 +1,10 @@
+[Unit]
+Description=Sauvegarde quotidienne Le Bon Prénom
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 Europe/Paris
+Persistent=true
+Unit=le-bon-prenom-backup.service
+
+[Install]
+WantedBy=timers.target
