@@ -1,4 +1,6 @@
 from django.db import transaction
+from django.shortcuts import get_object_or_404
+from rest_framework import status
 from rest_framework.generics import ListAPIView, ListCreateAPIView
 from rest_framework.permissions import (
     AllowAny,
@@ -8,9 +10,17 @@ from rest_framework.permissions import (
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import FirstName, NameSearch, NameSearchParticipant
-from .serializers import FirstNameSerializer, NameSearchSerializer
-
+from .models import (
+    FirstName,
+    NameDecision,
+    NameSearch,
+    NameSearchParticipant,
+)
+from .serializers import (
+    FirstNameSerializer,
+    NameDecisionSerializer,
+    NameSearchSerializer,
+)
 
 class PublicView(APIView):
     permission_classes = [AllowAny]
@@ -84,5 +94,60 @@ class NameSearchListCreateView(ListCreateAPIView):
             role=NameSearchParticipant.Role.OWNER,
             invitation_status=(
                 NameSearchParticipant.InvitationStatus.ACCEPTED
+            ),
+        )
+
+class NameDecisionListCreateView(APIView):
+    def get_participant(self, search_id):
+        return get_object_or_404(
+            NameSearchParticipant.objects.select_related(
+                "profile",
+                "search",
+            ),
+            search_id=search_id,
+            profile=self.request.user.profile,
+            invitation_status=(
+                NameSearchParticipant.InvitationStatus.ACCEPTED
+            ),
+        )
+
+    def get(self, request, search_id):
+        participant = self.get_participant(search_id)
+
+        decisions = (
+            NameDecision.objects.filter(participant=participant)
+            .select_related(
+                "participant__profile",
+                "participant__search",
+                "first_name",
+            )
+        )
+
+        serializer = NameDecisionSerializer(decisions, many=True)
+        return Response(serializer.data)
+
+    @transaction.atomic
+    def post(self, request, search_id):
+        participant = self.get_participant(search_id)
+
+        serializer = NameDecisionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        decision, created = NameDecision.objects.update_or_create(
+            participant=participant,
+            first_name=serializer.validated_data["first_name"],
+            defaults={
+                "choice": serializer.validated_data["choice"],
+            },
+        )
+
+        response_serializer = NameDecisionSerializer(decision)
+
+        return Response(
+            response_serializer.data,
+            status=(
+                status.HTTP_201_CREATED
+                if created
+                else status.HTTP_200_OK
             ),
         )
