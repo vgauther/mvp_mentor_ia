@@ -62,3 +62,38 @@ class FirstName(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+class NameSearch(models.Model):
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Active"
+        COMPLETED = "completed", "Terminée"
+        ARCHIVED = "archived", "Archivée"
+
+    creator = models.ForeignKey(
+        Profile,
+        on_delete=models.CASCADE,
+        related_name="name_searches",
+    )
+    title = models.CharField(max_length=150)
+    status = models.CharField(
+        max_length=10,
+        choices=Status.choices,
+        default=Status.ACTIVE,
+        db_index=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        verbose_name = "recherche de prénoms"
+        verbose_name_plural = "recherches de prénoms"
+        indexes = [
+            models.Index(
+                fields=("creator", "status"),
+                name="search_creator_status_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.title

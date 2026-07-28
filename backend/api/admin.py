@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import FirstName, Profile
+from .models import FirstName, NameSearch, Profile
 
 
 @admin.register(Profile)
@@ -43,6 +43,32 @@ class FirstNameAdmin(admin.ModelAdmin):
         "origin",
     )
     ordering = ("name",)
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+    )
+
+@admin.register(NameSearch)
+class NameSearchAdmin(admin.ModelAdmin):
+    list_display = (
+        "title",
+        "creator",
+        "status",
+        "created_at",
+        "updated_at",
+    )
+    list_filter = (
+        "status",
+        "created_at",
+    )
+    search_fields = (
+        "title",
+        "creator__username",
+        "creator__display_name",
+        "creator__email",
+    )
+    autocomplete_fields = ("creator",)
+    ordering = ("-created_at",)
     readonly_fields = (
         "created_at",
         "updated_at",
