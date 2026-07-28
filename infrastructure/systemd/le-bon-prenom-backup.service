@@ -1,0 +1,13 @@
+[Unit]
+Description=Sauvegarde des bases PostgreSQL Le Bon Prénom
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+User=victor
+Group=victor
+WorkingDirectory=/home/victor/le_bon_prenom_back
+ExecStart=/home/victor/le_bon_prenom_back/infrastructure/scripts/backup-databases.sh
+UMask=0077
+TimeoutStartSec=30min
