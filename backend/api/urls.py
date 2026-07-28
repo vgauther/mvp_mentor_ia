@@ -4,6 +4,7 @@ from .views import (
     AdminView,
     FirstNameListView,
     MeView,
+    NameDecisionListCreateView,
     NameSearchListCreateView,
     PublicView,
 )
@@ -22,5 +23,10 @@ urlpatterns = [
         "searches/",
         NameSearchListCreateView.as_view(),
         name="name-search-list-create",
+    ),
+    path(
+        "searches/<int:search_id>/decisions/",
+        NameDecisionListCreateView.as_view(),
+        name="name-decision-list-create",
     ),
 ]
