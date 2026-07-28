@@ -11,6 +11,7 @@ env = environ.Env(
     DJANGO_ALLOWED_HOSTS=(list, []),
     POSTGRES_PORT=(int, 5432),
     CORS_ALLOWED_ORIGINS=(list, []),
+    DJANGO_CSRF_TRUSTED_ORIGINS=(list, []),
 )
 
 environ.Env.read_env(BASE_DIR / ".env")
@@ -126,12 +127,28 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS")
+CSRF_TRUSTED_ORIGINS = env.list(
+    "DJANGO_CSRF_TRUSTED_ORIGINS"
+)
+
+# Nginx termine la connexion HTTPS puis transmet la requête à Django.
+SECURE_PROXY_SSL_HEADER = (
+    "HTTP_X_FORWARDED_PROTO",
+    "https",
+)
+
+# En production, les cookies ne doivent circuler qu’en HTTPS.
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
 
 KEYCLOAK_ISSUER = env("KEYCLOAK_ISSUER").rstrip("/")
 KEYCLOAK_AUDIENCE = env("KEYCLOAK_AUDIENCE")
-KEYCLOAK_JWKS_URL = (
-    f"{KEYCLOAK_ISSUER}/protocol/openid-connect/certs"
-)
+KEYCLOAK_JWKS_URL = env(
+    "KEYCLOAK_JWKS_URL",
+    default=(
+        f"{KEYCLOAK_ISSUER}/protocol/openid-connect/certs"
+    ),
+).rstrip("/")
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
