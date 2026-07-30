@@ -64,7 +64,7 @@ services:
 
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
-      KC_HOSTNAME: https://auth.le-bon-prenom.fr
+      KC_HOSTNAME: ${KEYCLOAK_HOSTNAME}
       KC_HTTP_ENABLED: "true"
       KC_PROXY_HEADERS: xforwarded
 
@@ -73,6 +73,7 @@ services:
 
     volumes:
       - ./keycloak/import:/opt/keycloak/data/import:ro
+      - ./keycloak/themes:/opt/keycloak/themes:ro
 
     depends_on:
       keycloak-postgres:

@@ -1,19 +1,23 @@
-﻿import { createApp } from 'vue'
+﻿import { createApp, type Component } from 'vue'
 import { createPinia } from 'pinia'
 
-import App from './App.vue'
 import keycloak from './auth/keycloak'
 
 async function bootstrap() {
   try {
-    await keycloak.init({
-      onLoad: 'login-required',
+    const isAuthenticated = await keycloak.init({
+      onLoad: 'check-sso',
       pkceMethod: 'S256',
+      checkLoginIframe: false,
     })
 
     const { default: router } = await import('./router')
 
-    const app = createApp(App)
+    const rootComponent: Component = isAuthenticated
+      ? (await import('./App.vue')).default
+      : (await import('./PublicHome.vue')).default
+
+    const app = createApp(rootComponent)
 
     app.use(createPinia())
     app.use(router)
