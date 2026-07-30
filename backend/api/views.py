@@ -1,7 +1,12 @@
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import status
-from rest_framework.generics import ListAPIView, ListCreateAPIView
+from rest_framework.exceptions import NotFound
+from rest_framework.generics import (
+    ListAPIView,
+    ListCreateAPIView,
+    RetrieveUpdateAPIView,
+)
 from rest_framework.permissions import (
     AllowAny,
     IsAdminUser,
@@ -15,12 +20,17 @@ from .models import (
     NameDecision,
     NameSearch,
     NameSearchParticipant,
+    Profile,
 )
 from .serializers import (
+    CurrentProfileSerializer,
     FirstNameSerializer,
     NameDecisionSerializer,
     NameSearchSerializer,
+    ProfileLookupQuerySerializer,
+    ProfileLookupSerializer,
 )
+
 
 class PublicView(APIView):
     permission_classes = [AllowAny]
@@ -33,18 +43,54 @@ class PublicView(APIView):
         )
 
 
-class MeView(APIView):
+class MeView(RetrieveUpdateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = CurrentProfileSerializer
+    http_method_names = [
+        "get",
+        "patch",
+        "head",
+        "options",
+    ]
+
+    def get_object(self):
+        return self.request.user.profile
+
+
+class ProfileLookupView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        return Response(
-            {
-                "id": request.user.id,
-                "username": request.user.username,
-                "email": request.user.email,
-                "roles": sorted(request.user.roles),
-            }
+        query_serializer = ProfileLookupQuerySerializer(
+            data=request.query_params,
         )
+        query_serializer.is_valid(raise_exception=True)
+
+        email = query_serializer.validated_data["email"]
+
+        profiles = list(
+            Profile.objects.filter(
+                email__iexact=email,
+            ).order_by("id")[:2]
+        )
+
+        if not profiles:
+            raise NotFound(
+                "Aucun profil ne correspond à cette adresse e-mail."
+            )
+
+        if len(profiles) > 1:
+            return Response(
+                {
+                    "detail": (
+                        "Plusieurs profils utilisent cette adresse e-mail."
+                    )
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        serializer = ProfileLookupSerializer(profiles[0])
+        return Response(serializer.data)
 
 
 class AdminView(APIView):
@@ -96,6 +142,7 @@ class NameSearchListCreateView(ListCreateAPIView):
                 NameSearchParticipant.InvitationStatus.ACCEPTED
             ),
         )
+
 
 class NameDecisionListCreateView(APIView):
     def get_participant(self, search_id):

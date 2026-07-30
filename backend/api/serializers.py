@@ -9,6 +9,71 @@ from .models import (
 )
 
 
+class CurrentProfileSerializer(serializers.ModelSerializer):
+    roles = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Profile
+        fields = (
+            "id",
+            "username",
+            "email",
+            "display_name",
+            "roles",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "id",
+            "username",
+            "email",
+            "roles",
+            "created_at",
+            "updated_at",
+        )
+
+    def get_roles(self, profile):
+        request = self.context.get("request")
+
+        if request is None:
+            return []
+
+        return sorted(getattr(request.user, "roles", []))
+
+    def validate(self, attributes):
+        writable_fields = {"display_name"}
+        received_fields = set(self.initial_data.keys())
+        protected_fields = received_fields - writable_fields
+
+        if protected_fields:
+            raise serializers.ValidationError(
+                {
+                    field: (
+                        "Ce champ ne peut pas être modifié depuis cette route."
+                    )
+                    for field in sorted(protected_fields)
+                }
+            )
+
+        return super().validate(attributes)
+
+
+class ProfileLookupQuerySerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class ProfileLookupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Profile
+        fields = (
+            "id",
+            "username",
+            "email",
+            "display_name",
+        )
+        read_only_fields = fields
+
+
 class ProfileSummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile

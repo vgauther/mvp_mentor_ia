@@ -6,6 +6,7 @@ from .views import (
     MeView,
     NameDecisionListCreateView,
     NameSearchListCreateView,
+    ProfileLookupView,
     PublicView,
 )
 
@@ -13,6 +14,11 @@ from .views import (
 urlpatterns = [
     path("public/", PublicView.as_view(), name="public"),
     path("me/", MeView.as_view(), name="me"),
+    path(
+        "profiles/lookup/",
+        ProfileLookupView.as_view(),
+        name="profile-lookup",
+    ),
     path("admin/", AdminView.as_view(), name="admin"),
     path(
         "first-names/",
