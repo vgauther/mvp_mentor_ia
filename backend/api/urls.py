@@ -5,10 +5,13 @@ from .views import (
     FirstNameListView,
     MeView,
     NameDecisionListCreateView,
-    NextFirstNameView,
     NameSearchListCreateView,
+    NextFirstNameView,
     ProfileLookupView,
     PublicView,
+    SearchInvitationCreateView,
+    SearchInvitationListView,
+    SearchInvitationResponseView,
 )
 
 
@@ -30,6 +33,21 @@ urlpatterns = [
         "searches/",
         NameSearchListCreateView.as_view(),
         name="name-search-list-create",
+    ),
+    path(
+        "searches/<int:search_id>/invitations/",
+        SearchInvitationCreateView.as_view(),
+        name="search-invitation-create",
+    ),
+    path(
+        "invitations/",
+        SearchInvitationListView.as_view(),
+        name="search-invitation-list",
+    ),
+    path(
+        "invitations/<int:invitation_id>/",
+        SearchInvitationResponseView.as_view(),
+        name="search-invitation-response",
     ),
     path(
         "searches/<int:search_id>/next-first-name/",
