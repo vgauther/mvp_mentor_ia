@@ -1,5 +1,6 @@
 from django.urls import path
 
+from .liked_first_names import SearchLikedFirstNameListView
 from .views import (
     AdminView,
     FirstNameListView,
@@ -59,6 +60,11 @@ urlpatterns = [
         "searches/<int:search_id>/decisions/",
         NameDecisionListCreateView.as_view(),
         name="name-decision-list-create",
+    ),
+    path(
+        "searches/<int:search_id>/liked-first-names/",
+        SearchLikedFirstNameListView.as_view(),
+        name="search-liked-first-name-list",
     ),
     path(
         "searches/<int:search_id>/matches/",
