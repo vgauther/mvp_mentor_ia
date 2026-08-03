@@ -29,6 +29,9 @@ from .serializers import (
     NameSearchSerializer,
     ProfileLookupQuerySerializer,
     ProfileLookupSerializer,
+    SearchInvitationCreateSerializer,
+    SearchInvitationResponseSerializer,
+    SearchInvitationSerializer,
 )
 
 
@@ -142,6 +145,211 @@ class NameSearchListCreateView(ListCreateAPIView):
                 NameSearchParticipant.InvitationStatus.ACCEPTED
             ),
         )
+
+
+class SearchInvitationCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_owner_participant(self, search_id):
+        return get_object_or_404(
+            NameSearchParticipant.objects.select_for_update().select_related(
+                "search",
+            ),
+            search_id=search_id,
+            profile=self.request.user.profile,
+            role=NameSearchParticipant.Role.OWNER,
+            invitation_status=(
+                NameSearchParticipant.InvitationStatus.ACCEPTED
+            ),
+        )
+
+    @transaction.atomic
+    def post(self, request, search_id):
+        owner_participant = self.get_owner_participant(search_id)
+        search = owner_participant.search
+
+        if search.status != NameSearch.Status.ACTIVE:
+            return Response(
+                {
+                    "detail": (
+                        "Il est impossible d'inviter un participant dans "
+                        "une recherche terminée ou archivée."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        input_serializer = SearchInvitationCreateSerializer(
+            data=request.data,
+        )
+        input_serializer.is_valid(raise_exception=True)
+
+        invited_profile = input_serializer.validated_data["profile"]
+
+        if invited_profile == request.user.profile:
+            return Response(
+                {
+                    "detail": (
+                        "Vous ne pouvez pas vous inviter dans votre propre "
+                        "recherche."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        existing_invitation = (
+            NameSearchParticipant.objects.select_for_update()
+            .filter(
+                search=search,
+                profile=invited_profile,
+            )
+            .first()
+        )
+
+        if (
+            existing_invitation is not None
+            and existing_invitation.invitation_status
+            in (
+                NameSearchParticipant.InvitationStatus.PENDING,
+                NameSearchParticipant.InvitationStatus.ACCEPTED,
+            )
+        ):
+            return Response(
+                {
+                    "detail": (
+                        "Ce profil participe déjà à cette recherche ou possède "
+                        "déjà une invitation en attente."
+                    )
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        another_guest_exists = (
+            NameSearchParticipant.objects.filter(
+                search=search,
+                role=NameSearchParticipant.Role.MEMBER,
+                invitation_status__in=(
+                    NameSearchParticipant.InvitationStatus.PENDING,
+                    NameSearchParticipant.InvitationStatus.ACCEPTED,
+                ),
+            )
+            .exclude(profile=invited_profile)
+            .exists()
+        )
+
+        if another_guest_exists:
+            return Response(
+                {
+                    "detail": (
+                        "Cette recherche possède déjà un participant ou une "
+                        "invitation en attente."
+                    )
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        if existing_invitation is not None:
+            existing_invitation.role = NameSearchParticipant.Role.MEMBER
+            existing_invitation.invitation_status = (
+                NameSearchParticipant.InvitationStatus.PENDING
+            )
+            existing_invitation.save(
+                update_fields=(
+                    "role",
+                    "invitation_status",
+                    "updated_at",
+                )
+            )
+            invitation = existing_invitation
+            response_status = status.HTTP_200_OK
+        else:
+            invitation = NameSearchParticipant.objects.create(
+                search=search,
+                profile=invited_profile,
+                role=NameSearchParticipant.Role.MEMBER,
+                invitation_status=(
+                    NameSearchParticipant.InvitationStatus.PENDING
+                ),
+            )
+            response_status = status.HTTP_201_CREATED
+
+        output_serializer = SearchInvitationSerializer(invitation)
+
+        return Response(
+            output_serializer.data,
+            status=response_status,
+        )
+
+
+class SearchInvitationListView(ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = SearchInvitationSerializer
+
+    def get_queryset(self):
+        return (
+            NameSearchParticipant.objects.filter(
+                profile=self.request.user.profile,
+                role=NameSearchParticipant.Role.MEMBER,
+                invitation_status=(
+                    NameSearchParticipant.InvitationStatus.PENDING
+                ),
+            )
+            .select_related(
+                "profile",
+                "search",
+                "search__creator",
+            )
+            .order_by("-created_at")
+        )
+
+
+class SearchInvitationResponseView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def patch(self, request, invitation_id):
+        invitation = get_object_or_404(
+            NameSearchParticipant.objects.select_for_update().select_related(
+                "profile",
+                "search",
+                "search__creator",
+            ),
+            id=invitation_id,
+            profile=request.user.profile,
+            role=NameSearchParticipant.Role.MEMBER,
+        )
+
+        if (
+            invitation.invitation_status
+            != NameSearchParticipant.InvitationStatus.PENDING
+        ):
+            return Response(
+                {
+                    "detail": (
+                        "Cette invitation a déjà été acceptée ou refusée."
+                    )
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        input_serializer = SearchInvitationResponseSerializer(
+            data=request.data,
+        )
+        input_serializer.is_valid(raise_exception=True)
+
+        invitation.invitation_status = input_serializer.validated_data[
+            "invitation_status"
+        ]
+        invitation.save(
+            update_fields=(
+                "invitation_status",
+                "updated_at",
+            )
+        )
+
+        output_serializer = SearchInvitationSerializer(invitation)
+
+        return Response(output_serializer.data)
 
 
 class NextFirstNameView(APIView):

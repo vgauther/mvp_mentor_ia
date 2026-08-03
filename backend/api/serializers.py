@@ -85,6 +85,65 @@ class ProfileSummarySerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class InvitationSearchSummarySerializer(serializers.ModelSerializer):
+    creator = ProfileSummarySerializer(read_only=True)
+
+    class Meta:
+        model = NameSearch
+        fields = (
+            "id",
+            "title",
+            "status",
+            "creator",
+        )
+        read_only_fields = fields
+
+
+class SearchInvitationSerializer(serializers.ModelSerializer):
+    search = InvitationSearchSummarySerializer(read_only=True)
+    profile = ProfileSummarySerializer(read_only=True)
+    role_label = serializers.CharField(
+        source="get_role_display",
+        read_only=True,
+    )
+    invitation_status_label = serializers.CharField(
+        source="get_invitation_status_display",
+        read_only=True,
+    )
+
+    class Meta:
+        model = NameSearchParticipant
+        fields = (
+            "id",
+            "search",
+            "profile",
+            "role",
+            "role_label",
+            "invitation_status",
+            "invitation_status_label",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields
+
+
+class SearchInvitationCreateSerializer(serializers.Serializer):
+    profile_id = serializers.PrimaryKeyRelatedField(
+        source="profile",
+        queryset=Profile.objects.all(),
+        write_only=True,
+    )
+
+
+class SearchInvitationResponseSerializer(serializers.Serializer):
+    invitation_status = serializers.ChoiceField(
+        choices=(
+            NameSearchParticipant.InvitationStatus.ACCEPTED,
+            NameSearchParticipant.InvitationStatus.DECLINED,
+        ),
+    )
+
+
 class FirstNameSerializer(serializers.ModelSerializer):
     gender_label = serializers.CharField(
         source="get_gender_display",
