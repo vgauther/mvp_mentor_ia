@@ -1,18 +1,21 @@
 from django.urls import path
 
 from .liked_first_names import SearchLikedFirstNameListView
+from .search_lifecycle import (
+    LifecycleNameDecisionListCreateView,
+    LifecycleNextFirstNameView,
+    LifecycleSearchInvitationResponseView,
+    SearchStatusUpdateView,
+)
 from .views import (
     AdminView,
     FirstNameListView,
     MeView,
-    NameDecisionListCreateView,
     NameSearchListCreateView,
-    NextFirstNameView,
     ProfileLookupView,
     PublicView,
     SearchInvitationCreateView,
     SearchInvitationListView,
-    SearchInvitationResponseView,
     SearchMatchListView,
 )
 
@@ -37,6 +40,11 @@ urlpatterns = [
         name="name-search-list-create",
     ),
     path(
+        "searches/<int:search_id>/status/",
+        SearchStatusUpdateView.as_view(),
+        name="search-status-update",
+    ),
+    path(
         "searches/<int:search_id>/invitations/",
         SearchInvitationCreateView.as_view(),
         name="search-invitation-create",
@@ -48,17 +56,17 @@ urlpatterns = [
     ),
     path(
         "invitations/<int:invitation_id>/",
-        SearchInvitationResponseView.as_view(),
+        LifecycleSearchInvitationResponseView.as_view(),
         name="search-invitation-response",
     ),
     path(
         "searches/<int:search_id>/next-first-name/",
-        NextFirstNameView.as_view(),
+        LifecycleNextFirstNameView.as_view(),
         name="next-first-name",
     ),
     path(
         "searches/<int:search_id>/decisions/",
-        NameDecisionListCreateView.as_view(),
+        LifecycleNameDecisionListCreateView.as_view(),
         name="name-decision-list-create",
     ),
     path(
