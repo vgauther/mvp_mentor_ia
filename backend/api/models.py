@@ -63,6 +63,15 @@ class FirstName(models.Model):
     def __str__(self) -> str:
         return self.name
 
+
+def default_search_genders():
+    return [
+        FirstName.Gender.FEMALE,
+        FirstName.Gender.MALE,
+        FirstName.Gender.MIXED,
+    ]
+
+
 class NameSearch(models.Model):
     class Status(models.TextChoices):
         ACTIVE = "active", "Active"
@@ -75,6 +84,7 @@ class NameSearch(models.Model):
         related_name="name_searches",
     )
     title = models.CharField(max_length=150)
+    genders = models.JSONField(default=default_search_genders)
     status = models.CharField(
         max_length=10,
         choices=Status.choices,
@@ -97,6 +107,7 @@ class NameSearch(models.Model):
 
     def __str__(self) -> str:
         return self.title
+
 
 class NameSearchParticipant(models.Model):
     class Role(models.TextChoices):
@@ -151,6 +162,7 @@ class NameSearchParticipant(models.Model):
 
     def __str__(self) -> str:
         return f"{self.profile} — {self.search}"
+
 
 class NameDecision(models.Model):
     class Choice(models.TextChoices):

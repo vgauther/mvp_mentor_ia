@@ -144,6 +144,41 @@ class NameSearchListCreateView(ListCreateAPIView):
         )
 
 
+class NextFirstNameView(APIView):
+    def get_participant(self, search_id):
+        return get_object_or_404(
+            NameSearchParticipant.objects.select_related("search"),
+            search_id=search_id,
+            profile=self.request.user.profile,
+            invitation_status=(
+                NameSearchParticipant.InvitationStatus.ACCEPTED
+            ),
+        )
+
+    def get(self, request, search_id):
+        participant = self.get_participant(search_id)
+
+        decided_first_name_ids = NameDecision.objects.filter(
+            participant=participant,
+        ).values("first_name_id")
+
+        first_name = (
+            FirstName.objects.filter(
+                is_active=True,
+                gender__in=participant.search.genders,
+            )
+            .exclude(id__in=decided_first_name_ids)
+            .order_by("id")
+            .first()
+        )
+
+        if first_name is None:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        serializer = FirstNameSerializer(first_name)
+        return Response(serializer.data)
+
+
 class NameDecisionListCreateView(APIView):
     def get_participant(self, search_id):
         return get_object_or_404(

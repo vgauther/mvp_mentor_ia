@@ -131,6 +131,13 @@ class NameSearchParticipantSerializer(serializers.ModelSerializer):
 
 
 class NameSearchSerializer(serializers.ModelSerializer):
+    genders = serializers.ListField(
+        child=serializers.ChoiceField(
+            choices=FirstName.Gender.choices,
+        ),
+        allow_empty=False,
+        required=False,
+    )
     creator = ProfileSummarySerializer(read_only=True)
     participants = NameSearchParticipantSerializer(
         many=True,
@@ -146,6 +153,7 @@ class NameSearchSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "title",
+            "genders",
             "status",
             "status_label",
             "creator",
@@ -162,6 +170,9 @@ class NameSearchSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         )
+
+    def validate_genders(self, genders):
+        return list(dict.fromkeys(genders))
 
 
 class NameDecisionSerializer(serializers.ModelSerializer):
