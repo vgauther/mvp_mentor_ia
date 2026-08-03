@@ -404,13 +404,12 @@ class NameDecisionListCreateView(APIView):
     def get(self, request, search_id):
         participant = self.get_participant(search_id)
 
-        decisions = (
-            NameDecision.objects.filter(participant=participant)
-            .select_related(
-                "participant__profile",
-                "participant__search",
-                "first_name",
-            )
+        decisions = NameDecision.objects.filter(
+            participant=participant,
+        ).select_related(
+            "participant__profile",
+            "participant__search",
+            "first_name",
         )
 
         serializer = NameDecisionSerializer(decisions, many=True)
@@ -441,3 +440,63 @@ class NameDecisionListCreateView(APIView):
                 else status.HTTP_200_OK
             ),
         )
+
+
+class SearchMatchListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_search(self, search_id):
+        participant = get_object_or_404(
+            NameSearchParticipant.objects.select_related("search"),
+            search_id=search_id,
+            profile=self.request.user.profile,
+            invitation_status=(
+                NameSearchParticipant.InvitationStatus.ACCEPTED
+            ),
+        )
+        return participant.search
+
+    def get(self, request, search_id):
+        search = self.get_search(search_id)
+
+        participant_ids = list(
+            NameSearchParticipant.objects.filter(
+                search=search,
+                invitation_status=(
+                    NameSearchParticipant.InvitationStatus.ACCEPTED
+                ),
+            )
+            .order_by("id")
+            .values_list("id", flat=True)
+        )
+
+        if len(participant_ids) != 2:
+            return Response([])
+
+        common_liked_first_name_ids = None
+
+        for participant_id in participant_ids:
+            liked_first_name_ids = set(
+                NameDecision.objects.filter(
+                    participant_id=participant_id,
+                    choice=NameDecision.Choice.LIKED,
+                ).values_list("first_name_id", flat=True)
+            )
+
+            if common_liked_first_name_ids is None:
+                common_liked_first_name_ids = liked_first_name_ids
+            else:
+                common_liked_first_name_ids.intersection_update(
+                    liked_first_name_ids
+                )
+
+            if not common_liked_first_name_ids:
+                return Response([])
+
+        first_names = FirstName.objects.filter(
+            id__in=common_liked_first_name_ids,
+            is_active=True,
+        ).order_by("name", "id")
+
+        serializer = FirstNameSerializer(first_names, many=True)
+        return Response(serializer.data)

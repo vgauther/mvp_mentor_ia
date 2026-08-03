@@ -12,6 +12,7 @@ from .views import (
     SearchInvitationCreateView,
     SearchInvitationListView,
     SearchInvitationResponseView,
+    SearchMatchListView,
 )
 
 
@@ -58,5 +59,10 @@ urlpatterns = [
         "searches/<int:search_id>/decisions/",
         NameDecisionListCreateView.as_view(),
         name="name-decision-list-create",
+    ),
+    path(
+        "searches/<int:search_id>/matches/",
+        SearchMatchListView.as_view(),
+        name="search-match-list",
     ),
 ]
