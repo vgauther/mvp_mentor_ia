@@ -7,6 +7,7 @@ from .search_lifecycle import (
     LifecycleSearchInvitationResponseView,
     SearchStatusUpdateView,
 )
+from .search_update import NameSearchUpdateView
 from .views import (
     AdminView,
     FirstNameListView,
@@ -38,6 +39,11 @@ urlpatterns = [
         "searches/",
         NameSearchListCreateView.as_view(),
         name="name-search-list-create",
+    ),
+    path(
+        "searches/<int:search_id>/",
+        NameSearchUpdateView.as_view(),
+        name="name-search-update",
     ),
     path(
         "searches/<int:search_id>/status/",
