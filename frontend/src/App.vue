@@ -3,10 +3,11 @@ import { computed, onMounted, ref } from 'vue'
 
 import { authenticatedFetch } from './api/client'
 import logoIconUrl from './assets/brand/logo-icon.png'
+import keycloak from './auth/keycloak'
 import ProfileSettings from './components/ProfileSettings.vue'
 import SearchDashboard from './components/SearchDashboard.vue'
-import keycloak from './auth/keycloak'
-import type { CurrentProfile } from './types/api'
+import SearchDetail from './components/SearchDetail.vue'
+import type { CurrentProfile, NameSearch } from './types/api'
 
 type AppSection = 'searches' | 'profile'
 
@@ -14,6 +15,7 @@ const user = ref<CurrentProfile | null>(null)
 const isLoading = ref(true)
 const loadError = ref('')
 const activeSection = ref<AppSection>('searches')
+const selectedSearch = ref<NameSearch | null>(null)
 
 const visibleName = computed(() => {
   if (!user.value) {
@@ -37,15 +39,29 @@ const initials = computed(() => {
     .join('')
 })
 
-const pageTitle = computed(() =>
-  activeSection.value === 'searches' ? 'Tes recherches de prénoms' : 'Ton profil',
-)
+const pageTitle = computed(() => {
+  if (activeSection.value === 'profile') {
+    return 'Ton profil'
+  }
 
-const pageDescription = computed(() =>
-  activeSection.value === 'searches'
-    ? 'Crée, partage et retrouve toutes tes recherches au même endroit.'
-    : 'Consulte tes informations et personnalise ton compte.',
-)
+  if (selectedSearch.value) {
+    return 'Détail de ta recherche'
+  }
+
+  return 'Tes recherches de prénoms'
+})
+
+const pageDescription = computed(() => {
+  if (activeSection.value === 'profile') {
+    return 'Consulte tes informations et personnalise ton compte.'
+  }
+
+  if (selectedSearch.value) {
+    return 'Consulte les participants, le statut et les fonctionnalités de cette recherche.'
+  }
+
+  return 'Crée, partage et retrouve toutes tes recherches au même endroit.'
+})
 
 async function loadUser() {
   isLoading.value = true
@@ -65,6 +81,31 @@ async function loadUser() {
   } finally {
     isLoading.value = false
   }
+}
+
+function showSearches() {
+  activeSection.value = 'searches'
+  selectedSearch.value = null
+}
+
+function showProfile() {
+  activeSection.value = 'profile'
+  selectedSearch.value = null
+}
+
+function openSearch(search: NameSearch) {
+  activeSection.value = 'searches'
+  selectedSearch.value = search
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+function closeSearch() {
+  selectedSearch.value = null
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+function updateSelectedSearch(search: NameSearch) {
+  selectedSearch.value = search
 }
 
 function updateProfile(profile: CurrentProfile) {
@@ -87,6 +128,7 @@ onMounted(() => {
     <aside class="sidebar">
       <a class="brand" href="/" aria-label="Accueil Le Bon Prénom">
         <img :src="logoIconUrl" alt="" />
+
         <span>
           <strong>Le Bon Prénom</strong>
           <small>Trouvez-le ensemble</small>
@@ -98,7 +140,7 @@ onMounted(() => {
           type="button"
           :class="{ active: activeSection === 'searches' }"
           data-test="searches-navigation"
-          @click="activeSection = 'searches'"
+          @click="showSearches"
         >
           <span class="nav-icon">♡</span>
           <span>Mes recherches</span>
@@ -108,7 +150,7 @@ onMounted(() => {
           type="button"
           :class="{ active: activeSection === 'profile' }"
           data-test="profile-navigation"
-          @click="activeSection = 'profile'"
+          @click="showProfile"
         >
           <span class="nav-icon">○</span>
           <span>Mon profil</span>
@@ -117,6 +159,7 @@ onMounted(() => {
 
       <div v-if="user" class="sidebar-profile">
         <span class="avatar">{{ initials }}</span>
+
         <span>
           <strong>{{ visibleName }}</strong>
           <small>{{ user.email || `@${user.username}` }}</small>
@@ -136,13 +179,41 @@ onMounted(() => {
           <strong>Le Bon Prénom</strong>
         </a>
 
-        <button type="button" class="mobile-logout" aria-label="Se déconnecter" @click="logout">
-          ↗
-        </button>
+        <div class="mobile-actions">
+          <button
+            v-if="activeSection === 'profile'"
+            type="button"
+            class="mobile-navigation"
+            aria-label="Afficher mes recherches"
+            @click="showSearches"
+          >
+            ♡
+          </button>
+
+          <button
+            v-else
+            type="button"
+            class="mobile-navigation"
+            aria-label="Afficher mon profil"
+            @click="showProfile"
+          >
+            ○
+          </button>
+
+          <button
+            type="button"
+            class="mobile-logout"
+            aria-label="Se déconnecter"
+            @click="logout"
+          >
+            ↗
+          </button>
+        </div>
       </header>
 
       <section v-if="isLoading" class="app-state" aria-live="polite">
         <span class="loader"></span>
+
         <div>
           <h1>Vérification de votre identité</h1>
           <p>Keycloak transmet votre accès sécurisé à Django…</p>
@@ -151,17 +222,24 @@ onMounted(() => {
 
       <section v-else-if="loadError" class="app-state error-state">
         <span class="state-symbol">!</span>
+
         <div>
           <h1>Connexion impossible</h1>
           <p role="alert">{{ loadError }}</p>
-          <button type="button" class="retry-button" @click="loadUser">Réessayer</button>
+          <button type="button" class="retry-button" @click="loadUser">
+            Réessayer
+          </button>
         </div>
       </section>
 
       <template v-else-if="user">
         <header class="page-heading">
           <div>
-            <p>Bonjour {{ visibleName }} <span aria-hidden="true">👋</span></p>
+            <p>
+              Bonjour {{ visibleName }}
+              <span aria-hidden="true">👋</span>
+            </p>
+
             <h1>{{ pageTitle }}</h1>
             <span>{{ pageDescription }}</span>
           </div>
@@ -172,12 +250,30 @@ onMounted(() => {
           </span>
         </header>
 
-        <SearchDashboard v-if="activeSection === 'searches'" :user-id="user.id" />
+        <SearchDetail
+          v-if="activeSection === 'searches' && selectedSearch"
+          :search="selectedSearch"
+          :user-id="user.id"
+          @back="closeSearch"
+          @search-updated="updateSelectedSearch"
+        />
 
-        <ProfileSettings v-else :user="user" @profile-updated="updateProfile" />
+        <SearchDashboard
+          v-else-if="activeSection === 'searches'"
+          :user-id="user.id"
+          @open-search="openSearch"
+        />
+
+        <ProfileSettings
+          v-else
+          :user="user"
+          @profile-updated="updateProfile"
+        />
       </template>
 
-      <footer class="app-footer">Le Bon Prénom · Keycloak · Django REST · Vue.js</footer>
+      <footer class="app-footer">
+        Le Bon Prénom · Keycloak · Django REST · Vue.js
+      </footer>
     </main>
   </div>
 </template>
@@ -199,7 +295,8 @@ onMounted(() => {
   color: #3f2e20;
   background:
     radial-gradient(circle at 88% 4%, rgba(163, 223, 241, 0.32), transparent 27rem),
-    radial-gradient(circle at 25% 95%, rgba(255, 192, 101, 0.2), transparent 32rem), #fff9f0;
+    radial-gradient(circle at 25% 95%, rgba(255, 192, 101, 0.2), transparent 32rem),
+    #fff9f0;
   font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
 }
 
@@ -371,8 +468,8 @@ nav button.active {
 }
 
 .main-content {
-  min-width: 0;
   width: min(1180px, 100%);
+  min-width: 0;
   margin: 0 auto;
   padding: 42px 42px 22px;
 }
@@ -432,10 +529,10 @@ nav button.active {
 
 .app-state {
   display: flex;
+  min-height: calc(100vh - 100px);
   align-items: center;
   justify-content: center;
   gap: 20px;
-  min-height: calc(100vh - 100px);
   padding: 30px;
   text-align: left;
 }
@@ -492,6 +589,30 @@ nav button.active {
   text-align: center;
 }
 
+.mobile-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mobile-navigation,
+.mobile-logout {
+  display: grid;
+  width: 39px;
+  height: 39px;
+  place-items: center;
+  color: #7d6958;
+  border: 1px solid #e5d7c9;
+  border-radius: 11px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.mobile-navigation {
+  color: #8d500c;
+  background: #fff5e5;
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -513,9 +634,9 @@ nav button.active {
 
   .mobile-header {
     display: flex;
+    min-height: 76px;
     align-items: center;
     justify-content: space-between;
-    min-height: 76px;
     margin-bottom: 25px;
     border-bottom: 1px solid #eddfd1;
   }
@@ -530,21 +651,6 @@ nav button.active {
   .mobile-brand strong {
     color: #d87208;
     font-size: 15px;
-  }
-
-  .mobile-logout {
-    display: grid;
-    width: 39px;
-    height: 39px;
-    place-items: center;
-    color: #7d6958;
-    border: 1px solid #e5d7c9;
-    border-radius: 11px;
-    background: #fff;
-  }
-
-  .page-heading::after {
-    content: '';
   }
 
   .page-heading {
