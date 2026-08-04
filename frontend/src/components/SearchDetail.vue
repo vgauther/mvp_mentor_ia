@@ -28,6 +28,10 @@ const isUpdatingStatus = ref(false)
 const statusError = ref('')
 const statusSuccess = ref('')
 const isBrowsingFirstNames = ref(false)
+const isViewingLikedFirstNames = ref(false)
+const likedFirstNames = ref<FirstName[]>([])
+const isLoadingLikedFirstNames = ref(false)
+const likedFirstNamesError = ref('')
 const isViewingMatches = ref(false)
 const matches = ref<FirstName[]>([])
 const isLoadingMatches = ref(false)
@@ -93,6 +97,9 @@ watch(
     currentSearch.value = search
 
     if (searchChanged) {
+      isViewingLikedFirstNames.value = false
+      likedFirstNames.value = []
+      likedFirstNamesError.value = ''
       isViewingMatches.value = false
       matches.value = []
       matchesError.value = ''
@@ -110,6 +117,7 @@ function openNameBrowser() {
     return
   }
 
+  isViewingLikedFirstNames.value = false
   isViewingMatches.value = false
   isBrowsingFirstNames.value = true
   window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -117,6 +125,45 @@ function openNameBrowser() {
 
 function closeNameBrowser() {
   isBrowsingFirstNames.value = false
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+async function loadLikedFirstNames() {
+  isLoadingLikedFirstNames.value = true
+  likedFirstNamesError.value = ''
+
+  try {
+    const response = await authenticatedFetch(
+      `/api/searches/${currentSearch.value.id}/liked-first-names/`,
+    )
+
+    if (!response.ok) {
+      likedFirstNamesError.value = await getErrorMessage(
+        response,
+        'Impossible de charger les prénoms aimés de cette recherche.',
+      )
+      return
+    }
+
+    likedFirstNames.value = (await response.json()) as FirstName[]
+  } catch (error) {
+    console.error('Échec du chargement des prénoms aimés :', error)
+    likedFirstNamesError.value = 'Impossible de contacter Django pour charger les prénoms aimés.'
+  } finally {
+    isLoadingLikedFirstNames.value = false
+  }
+}
+
+async function openLikedFirstNames() {
+  isBrowsingFirstNames.value = false
+  isViewingMatches.value = false
+  isViewingLikedFirstNames.value = true
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+  await loadLikedFirstNames()
+}
+
+function closeLikedFirstNames() {
+  isViewingLikedFirstNames.value = false
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
@@ -146,6 +193,7 @@ async function loadMatches() {
 
 async function openMatches() {
   isBrowsingFirstNames.value = false
+  isViewingLikedFirstNames.value = false
   isViewingMatches.value = true
   window.scrollTo({ top: 0, behavior: 'smooth' })
   await loadMatches()
@@ -351,6 +399,104 @@ async function updateStatus(newStatus: SearchStatus) {
       @back="closeNameBrowser"
     />
 
+    <section v-else-if="isViewingLikedFirstNames" class="liked-view">
+      <button
+        type="button"
+        class="back-button"
+        data-test="back-to-search-detail"
+        @click="closeLikedFirstNames"
+      >
+        <span>←</span>
+        Retour à la recherche
+      </button>
+
+      <section class="liked-hero">
+        <div>
+          <p class="eyebrow">Ta sélection personnelle</p>
+          <h2>Les prénoms que tu aimes</h2>
+          <p>
+            Retrouve tous les prénoms que tu as aimés dans « {{ currentSearch.title }} ». Cette
+            liste contient uniquement tes propres choix.
+          </p>
+        </div>
+
+        <div class="liked-total" aria-live="polite">
+          <strong>{{ isLoadingLikedFirstNames ? '…' : likedFirstNames.length }}</strong>
+          <span>{{ likedFirstNames.length > 1 ? 'prénoms aimés' : 'prénom aimé' }}</span>
+        </div>
+      </section>
+
+      <div class="matches-toolbar">
+        <div>
+          <span class="section-kicker">Ta liste</span>
+          <h3>Prénoms conservés</h3>
+        </div>
+        <button
+          type="button"
+          class="refresh-button"
+          :disabled="isLoadingLikedFirstNames"
+          data-test="refresh-liked-first-names"
+          @click="loadLikedFirstNames"
+        >
+          {{ isLoadingLikedFirstNames ? 'Actualisation…' : 'Actualiser' }}
+        </button>
+      </div>
+
+      <div v-if="isLoadingLikedFirstNames" class="matches-state" role="status">
+        <span class="loading-liked">✓</span>
+        <div>
+          <strong>Chargement de tes prénoms aimés…</strong>
+          <p>Nous récupérons les prénoms que tu as conservés dans cette recherche.</p>
+        </div>
+      </div>
+
+      <div v-else-if="likedFirstNamesError" class="matches-state error-state" role="alert">
+        <span>!</span>
+        <div>
+          <strong>Les prénoms aimés n’ont pas pu être chargés</strong>
+          <p>{{ likedFirstNamesError }}</p>
+          <button type="button" @click="loadLikedFirstNames">Réessayer</button>
+        </div>
+      </div>
+
+      <div v-else-if="likedFirstNames.length === 0" class="matches-state empty-state">
+        <span>♡</span>
+        <div>
+          <strong>Tu n’as encore aimé aucun prénom</strong>
+          <p v-if="currentSearch.status === 'active'">
+            Parcours les propositions de cette recherche et utilise le bouton « J’aime » pour
+            constituer ta sélection.
+          </p>
+          <p v-else>Aucun prénom n’a été conservé avant la fin de cette recherche.</p>
+        </div>
+      </div>
+
+      <div v-else class="matches-grid" data-test="liked-first-names-list">
+        <article
+          v-for="(firstName, index) in likedFirstNames"
+          :key="firstName.id"
+          class="match-card liked-card"
+        >
+          <div class="match-card-heading">
+            <span class="match-number">{{ String(index + 1).padStart(2, '0') }}</span>
+            <span class="liked-check">✓</span>
+          </div>
+
+          <h3>{{ firstName.name }}</h3>
+
+          <div class="match-tags liked-tags">
+            <span>{{ genderLabels[firstName.gender] }}</span>
+            <span>{{ firstName.origin || 'Origine non renseignée' }}</span>
+          </div>
+
+          <div class="meaning-block">
+            <span>Signification</span>
+            <p>{{ firstName.meaning || 'Aucune signification renseignée pour ce prénom.' }}</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
     <section v-else-if="isViewingMatches" class="matches-view">
       <button
         type="button"
@@ -367,8 +513,8 @@ async function updateStatus(newStatus: SearchStatus) {
           <p class="eyebrow">Résultats communs</p>
           <h2>Les matchs de « {{ currentSearch.title }} »</h2>
           <p>
-            Retrouve ici les prénoms aimés par les deux participants. La liste évolue au
-            fur et à mesure de vos décisions.
+            Retrouve ici les prénoms aimés par les deux participants. La liste évolue au fur et à
+            mesure de vos décisions.
           </p>
         </div>
 
@@ -416,15 +562,15 @@ async function updateStatus(newStatus: SearchStatus) {
         <div v-if="acceptedParticipants.length < 2">
           <strong>Le second participant n’a pas encore rejoint la recherche</strong>
           <p>
-            Les matchs apparaîtront ici dès que son invitation sera acceptée et que vous
-            aurez commencé à choisir des prénoms.
+            Les matchs apparaîtront ici dès que son invitation sera acceptée et que vous aurez
+            commencé à choisir des prénoms.
           </p>
         </div>
         <div v-else>
           <strong>Aucun match pour le moment</strong>
           <p>
-            Continuez à parcourir les prénoms. Dès que vous aimerez tous les deux le même
-            prénom, il apparaîtra ici.
+            Continuez à parcourir les prénoms. Dès que vous aimerez tous les deux le même prénom, il
+            apparaîtra ici.
           </p>
         </div>
       </div>
@@ -581,11 +727,7 @@ async function updateStatus(newStatus: SearchStatus) {
             <p v-if="invitationError" class="invitation-message error-message" role="alert">
               {{ invitationError }}
             </p>
-            <p
-              v-if="invitationSuccess"
-              class="invitation-message success-message"
-              role="status"
-            >
+            <p v-if="invitationSuccess" class="invitation-message success-message" role="status">
               {{ invitationSuccess }}
             </p>
 
@@ -713,7 +855,9 @@ async function updateStatus(newStatus: SearchStatus) {
               <h4>Prénoms aimés</h4>
               <p>Retrouve les prénoms que tu as conservés pendant ton parcours.</p>
             </div>
-            <button type="button" disabled>Bientôt</button>
+            <button type="button" data-test="view-liked-first-names" @click="openLikedFirstNames">
+              Voir mes prénoms →
+            </button>
           </article>
 
           <article>
@@ -738,7 +882,8 @@ async function updateStatus(newStatus: SearchStatus) {
   gap: 20px;
 }
 
-.matches-view {
+.matches-view,
+.liked-view {
   display: grid;
   gap: 20px;
 }
@@ -763,6 +908,7 @@ async function updateStatus(newStatus: SearchStatus) {
 .hero-card,
 .panel,
 .features-section,
+.liked-hero,
 .matches-hero,
 .matches-state,
 .match-card {
@@ -772,6 +918,7 @@ async function updateStatus(newStatus: SearchStatus) {
   box-shadow: 0 18px 45px rgba(119, 82, 38, 0.07);
 }
 
+.liked-hero,
 .matches-hero {
   display: flex;
   align-items: center;
@@ -783,6 +930,13 @@ async function updateStatus(newStatus: SearchStatus) {
     linear-gradient(135deg, rgba(255, 255, 255, 0.97), rgba(255, 249, 239, 0.97));
 }
 
+.liked-hero {
+  background:
+    radial-gradient(circle at 94% 12%, rgba(163, 223, 241, 0.48), transparent 14rem),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.97), rgba(241, 251, 254, 0.97));
+}
+
+.liked-hero h2,
 .matches-hero h2 {
   margin: 4px 0 12px;
   color: #4a3421;
@@ -790,6 +944,7 @@ async function updateStatus(newStatus: SearchStatus) {
   line-height: 1.1;
 }
 
+.liked-hero > div:first-child > p:last-child,
 .matches-hero > div:first-child > p:last-child {
   max-width: 690px;
   margin: 0;
@@ -797,6 +952,7 @@ async function updateStatus(newStatus: SearchStatus) {
   line-height: 1.65;
 }
 
+.liked-total,
 .match-total {
   display: grid;
   min-width: 155px;
@@ -808,11 +964,18 @@ async function updateStatus(newStatus: SearchStatus) {
   background: rgba(255, 255, 255, 0.75);
 }
 
+.liked-total {
+  color: #24758d;
+  border-color: rgba(36, 117, 141, 0.14);
+}
+
+.liked-total strong,
 .match-total strong {
   font-size: 2.4rem;
   line-height: 1;
 }
 
+.liked-total span,
 .match-total span {
   margin-top: 7px;
   font-size: 0.76rem;
@@ -888,6 +1051,15 @@ async function updateStatus(newStatus: SearchStatus) {
   animation: heart-pulse 1.1s ease-in-out infinite;
 }
 
+.loading-liked {
+  animation: liked-pulse 1.1s ease-in-out infinite;
+}
+
+.matches-state > .loading-liked {
+  color: #24758d;
+  background: #dff4fa;
+}
+
 .error-state > span {
   color: #a13e30;
   background: #fff0ed;
@@ -931,6 +1103,28 @@ async function updateStatus(newStatus: SearchStatus) {
   background: #fee4b8;
 }
 
+.liked-check {
+  display: grid;
+  width: 37px;
+  height: 37px;
+  place-items: center;
+  border-radius: 12px;
+  color: #24758d;
+  background: #dff4fa;
+  font-weight: 900;
+}
+
+.liked-card {
+  background:
+    radial-gradient(circle at 100% 0, rgba(163, 223, 241, 0.28), transparent 10rem),
+    rgba(255, 255, 255, 0.92);
+}
+
+.match-tags.liked-tags span {
+  color: #286d81;
+  background: #e6f7fb;
+}
+
 .match-card h3 {
   margin: 0;
   color: #4a3421;
@@ -972,6 +1166,17 @@ async function updateStatus(newStatus: SearchStatus) {
 }
 
 @keyframes heart-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.12);
+  }
+}
+
+@keyframes liked-pulse {
   0%,
   100% {
     transform: scale(1);
@@ -1491,12 +1696,14 @@ async function updateStatus(newStatus: SearchStatus) {
     padding: 22px;
   }
 
-  .matches-hero {
+  .matches-hero,
+  .liked-hero {
     display: grid;
     padding: 22px;
   }
 
-  .match-total {
+  .match-total,
+  .liked-total {
     min-width: 0;
   }
 
