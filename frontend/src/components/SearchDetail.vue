@@ -2,7 +2,13 @@
 import { computed, ref, watch } from 'vue'
 
 import { authenticatedFetch, getErrorMessage } from '../api/client'
-import type { NameSearch, NameSearchParticipant, SearchGender, SearchStatus } from '../types/api'
+import type {
+  FirstName,
+  NameSearch,
+  NameSearchParticipant,
+  SearchGender,
+  SearchStatus,
+} from '../types/api'
 import NameBrowser from './NameBrowser.vue'
 
 const props = defineProps<{
@@ -20,6 +26,10 @@ const isUpdatingStatus = ref(false)
 const statusError = ref('')
 const statusSuccess = ref('')
 const isBrowsingFirstNames = ref(false)
+const isViewingMatches = ref(false)
+const matches = ref<FirstName[]>([])
+const isLoadingMatches = ref(false)
+const matchesError = ref('')
 
 const genderLabels: Record<SearchGender, string> = {
   female: 'Féminin',
@@ -63,7 +73,14 @@ const statusDescription = computed(() => {
 watch(
   () => props.search,
   (search) => {
+    const searchChanged = currentSearch.value.id !== search.id
     currentSearch.value = search
+
+    if (searchChanged) {
+      isViewingMatches.value = false
+      matches.value = []
+      matchesError.value = ''
+    }
 
     if (search.status !== 'active') {
       isBrowsingFirstNames.value = false
@@ -76,12 +93,49 @@ function openNameBrowser() {
     return
   }
 
+  isViewingMatches.value = false
   isBrowsingFirstNames.value = true
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 function closeNameBrowser() {
   isBrowsingFirstNames.value = false
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+async function loadMatches() {
+  isLoadingMatches.value = true
+  matchesError.value = ''
+
+  try {
+    const response = await authenticatedFetch(`/api/searches/${currentSearch.value.id}/matches/`)
+
+    if (!response.ok) {
+      matchesError.value = await getErrorMessage(
+        response,
+        'Impossible de charger les matchs de cette recherche.',
+      )
+      return
+    }
+
+    matches.value = (await response.json()) as FirstName[]
+  } catch (error) {
+    console.error('Échec du chargement des matchs :', error)
+    matchesError.value = 'Impossible de contacter Django pour charger les matchs.'
+  } finally {
+    isLoadingMatches.value = false
+  }
+}
+
+async function openMatches() {
+  isBrowsingFirstNames.value = false
+  isViewingMatches.value = true
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+  await loadMatches()
+}
+
+function closeMatches() {
+  isViewingMatches.value = false
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
@@ -158,6 +212,106 @@ async function updateStatus(newStatus: SearchStatus) {
       :search-title="currentSearch.title"
       @back="closeNameBrowser"
     />
+
+    <section v-else-if="isViewingMatches" class="matches-view">
+      <button
+        type="button"
+        class="back-button"
+        data-test="back-to-search-detail"
+        @click="closeMatches"
+      >
+        <span>←</span>
+        Retour à la recherche
+      </button>
+
+      <section class="matches-hero">
+        <div>
+          <p class="eyebrow">Résultats communs</p>
+          <h2>Les matchs de « {{ currentSearch.title }} »</h2>
+          <p>
+            Retrouve ici les prénoms aimés par les deux participants. La liste évolue au
+            fur et à mesure de vos décisions.
+          </p>
+        </div>
+
+        <div class="match-total" aria-live="polite">
+          <strong>{{ isLoadingMatches ? '…' : matches.length }}</strong>
+          <span>{{ matches.length > 1 ? 'matchs trouvés' : 'match trouvé' }}</span>
+        </div>
+      </section>
+
+      <div class="matches-toolbar">
+        <div>
+          <span class="section-kicker">Sélection commune</span>
+          <h3>Prénoms appréciés ensemble</h3>
+        </div>
+        <button
+          type="button"
+          class="refresh-button"
+          :disabled="isLoadingMatches"
+          data-test="refresh-search-matches"
+          @click="loadMatches"
+        >
+          {{ isLoadingMatches ? 'Actualisation…' : 'Actualiser' }}
+        </button>
+      </div>
+
+      <div v-if="isLoadingMatches" class="matches-state" role="status">
+        <span class="loading-heart">♥</span>
+        <div>
+          <strong>Recherche des matchs…</strong>
+          <p>Nous comparons les prénoms aimés par les deux participants.</p>
+        </div>
+      </div>
+
+      <div v-else-if="matchesError" class="matches-state error-state" role="alert">
+        <span>!</span>
+        <div>
+          <strong>Les matchs n’ont pas pu être chargés</strong>
+          <p>{{ matchesError }}</p>
+          <button type="button" @click="loadMatches">Réessayer</button>
+        </div>
+      </div>
+
+      <div v-else-if="matches.length === 0" class="matches-state empty-state">
+        <span>♡</span>
+        <div v-if="acceptedParticipants.length < 2">
+          <strong>Le second participant n’a pas encore rejoint la recherche</strong>
+          <p>
+            Les matchs apparaîtront ici dès que son invitation sera acceptée et que vous
+            aurez commencé à choisir des prénoms.
+          </p>
+        </div>
+        <div v-else>
+          <strong>Aucun match pour le moment</strong>
+          <p>
+            Continuez à parcourir les prénoms. Dès que vous aimerez tous les deux le même
+            prénom, il apparaîtra ici.
+          </p>
+        </div>
+      </div>
+
+      <div v-else class="matches-grid" data-test="search-matches-list">
+        <article v-for="(firstName, index) in matches" :key="firstName.id" class="match-card">
+          <div class="match-card-heading">
+            <span class="match-number">{{ String(index + 1).padStart(2, '0') }}</span>
+            <span class="match-heart">♥</span>
+          </div>
+
+          <h3>{{ firstName.name }}</h3>
+
+          <div class="match-tags">
+            <span>{{ genderLabels[firstName.gender] }}</span>
+            <span>{{ firstName.origin || 'Origine non renseignée' }}</span>
+          </div>
+
+          <div class="meaning-block">
+            <span>Signification</span>
+            <p>{{ firstName.meaning || 'Aucune signification renseignée pour ce prénom.' }}</p>
+          </div>
+        </article>
+      </div>
+    </section>
 
     <template v-else>
       <button type="button" class="back-button" data-test="back-to-searches" @click="emit('back')">
@@ -354,7 +508,9 @@ async function updateStatus(newStatus: SearchStatus) {
               <h4>Résultats et matchs</h4>
               <p>Découvre les prénoms appréciés par tous les participants.</p>
             </div>
-            <button type="button" disabled>Bientôt</button>
+            <button type="button" data-test="view-search-matches" @click="openMatches">
+              Voir les matchs →
+            </button>
           </article>
         </div>
       </section>
@@ -364,6 +520,11 @@ async function updateStatus(newStatus: SearchStatus) {
 
 <style scoped>
 .detail-content {
+  display: grid;
+  gap: 20px;
+}
+
+.matches-view {
   display: grid;
   gap: 20px;
 }
@@ -387,11 +548,224 @@ async function updateStatus(newStatus: SearchStatus) {
 
 .hero-card,
 .panel,
-.features-section {
+.features-section,
+.matches-hero,
+.matches-state,
+.match-card {
   border: 1px solid rgba(126, 83, 35, 0.1);
   border-radius: 25px;
   background: rgba(255, 255, 255, 0.9);
   box-shadow: 0 18px 45px rgba(119, 82, 38, 0.07);
+}
+
+.matches-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30px;
+  padding: 31px;
+  background:
+    radial-gradient(circle at 94% 12%, rgba(255, 218, 123, 0.45), transparent 14rem),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.97), rgba(255, 249, 239, 0.97));
+}
+
+.matches-hero h2 {
+  margin: 4px 0 12px;
+  color: #4a3421;
+  font-size: clamp(1.75rem, 4vw, 2.55rem);
+  line-height: 1.1;
+}
+
+.matches-hero > div:first-child > p:last-child {
+  max-width: 690px;
+  margin: 0;
+  color: #7d6552;
+  line-height: 1.65;
+}
+
+.match-total {
+  display: grid;
+  min-width: 155px;
+  place-items: center;
+  padding: 23px 20px;
+  border: 1px solid rgba(185, 126, 33, 0.13);
+  border-radius: 20px;
+  color: #87591c;
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.match-total strong {
+  font-size: 2.4rem;
+  line-height: 1;
+}
+
+.match-total span {
+  margin-top: 7px;
+  font-size: 0.76rem;
+  font-weight: 850;
+}
+
+.matches-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.matches-toolbar h3 {
+  margin: 4px 0 0;
+  color: #4a3421;
+  font-size: 1.25rem;
+}
+
+.refresh-button,
+.matches-state button {
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid #e1cdb9;
+  border-radius: 11px;
+  color: #6f5742;
+  background: #fffaf3;
+  cursor: pointer;
+  font-weight: 850;
+}
+
+.refresh-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.matches-state {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 27px;
+}
+
+.matches-state > span {
+  display: grid;
+  width: 54px;
+  height: 54px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 17px;
+  color: #9b6724;
+  background: #fff0c9;
+  font-size: 1.5rem;
+  font-weight: 900;
+}
+
+.matches-state strong {
+  color: #4e3825;
+  font-size: 1.05rem;
+}
+
+.matches-state p {
+  margin: 5px 0 0;
+  color: #8a7461;
+  line-height: 1.55;
+}
+
+.matches-state button {
+  margin-top: 13px;
+}
+
+.loading-heart {
+  animation: heart-pulse 1.1s ease-in-out infinite;
+}
+
+.error-state > span {
+  color: #a13e30;
+  background: #fff0ed;
+}
+
+.matches-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.match-card {
+  display: grid;
+  gap: 16px;
+  padding: 23px;
+  background:
+    radial-gradient(circle at 100% 0, rgba(255, 229, 166, 0.32), transparent 10rem),
+    rgba(255, 255, 255, 0.92);
+}
+
+.match-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.match-number {
+  color: #a18c78;
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.match-heart {
+  display: grid;
+  width: 37px;
+  height: 37px;
+  place-items: center;
+  border-radius: 12px;
+  color: #a65d13;
+  background: #fee4b8;
+}
+
+.match-card h3 {
+  margin: 0;
+  color: #4a3421;
+  font-size: 1.65rem;
+}
+
+.match-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.match-tags span {
+  padding: 6px 10px;
+  border-radius: 999px;
+  color: #76512e;
+  background: #fff0d8;
+  font-size: 0.75rem;
+  font-weight: 850;
+}
+
+.meaning-block {
+  padding-top: 15px;
+  border-top: 1px solid #f0e5d8;
+}
+
+.meaning-block span {
+  color: #a18c78;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.meaning-block p {
+  margin: 6px 0 0;
+  color: #725e4c;
+  line-height: 1.55;
+}
+
+@keyframes heart-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.12);
+  }
 }
 
 .hero-card {
@@ -761,12 +1135,18 @@ async function updateStatus(newStatus: SearchStatus) {
   border-radius: 10px;
   color: #907861;
   background: #f4eee7;
+  cursor: pointer;
   font-weight: 800;
+}
+
+.feature-grid button:disabled {
+  cursor: not-allowed;
 }
 
 @media (max-width: 950px) {
   .detail-grid,
-  .feature-grid {
+  .feature-grid,
+  .matches-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -775,6 +1155,19 @@ async function updateStatus(newStatus: SearchStatus) {
   .hero-card {
     display: grid;
     padding: 22px;
+  }
+
+  .matches-hero {
+    display: grid;
+    padding: 22px;
+  }
+
+  .match-total {
+    min-width: 0;
+  }
+
+  .matches-toolbar {
+    align-items: flex-start;
   }
 
   .hero-meta {
@@ -793,6 +1186,17 @@ async function updateStatus(newStatus: SearchStatus) {
   .participant-role {
     grid-column: 2;
     width: fit-content;
+  }
+}
+
+@media (max-width: 520px) {
+  .matches-toolbar,
+  .matches-state {
+    display: grid;
+  }
+
+  .refresh-button {
+    width: 100%;
   }
 }
 </style>
