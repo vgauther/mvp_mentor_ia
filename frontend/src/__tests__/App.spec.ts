@@ -29,6 +29,37 @@ const profile = {
   updated_at: '2026-07-30T08:30:00Z',
 }
 
+const activeSearch = {
+  id: 41,
+  title: 'Notre futur prénom',
+  genders: ['female', 'male', 'mixed'],
+  status: 'active',
+  status_label: 'Active',
+  creator: {
+    id: profile.id,
+    username: profile.username,
+    display_name: profile.display_name,
+  },
+  participants: [
+    {
+      id: 91,
+      profile: {
+        id: profile.id,
+        username: profile.username,
+        display_name: profile.display_name,
+      },
+      role: 'owner',
+      role_label: 'Propriétaire',
+      invitation_status: 'accepted',
+      invitation_status_label: 'Acceptée',
+      created_at: '2026-08-04T08:00:00Z',
+      updated_at: '2026-08-04T08:00:00Z',
+    },
+  ],
+  created_at: '2026-08-04T08:00:00Z',
+  updated_at: '2026-08-04T08:00:00Z',
+}
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -36,6 +67,11 @@ function jsonResponse(body: unknown, status = 200) {
       'Content-Type': 'application/json',
     },
   })
+}
+
+async function finishInitialLoading() {
+  await flushPromises()
+  await flushPromises()
 }
 
 afterEach(() => {
@@ -48,8 +84,11 @@ afterEach(() => {
 })
 
 describe('App', () => {
-  it('envoie le jeton Keycloak et affiche le profil Django', async () => {
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(profile))
+  it('envoie le jeton Keycloak et affiche le profil ainsi que les recherches Django', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse(profile))
+      .mockResolvedValueOnce(jsonResponse([activeSearch]))
 
     vi.stubEnv('VITE_API_URL', 'http://127.0.0.1:8000')
     vi.stubGlobal('fetch', fetchMock)
@@ -58,30 +97,126 @@ describe('App', () => {
 
     expect(wrapper.text()).toContain('Vérification de votre identité')
 
-    await flushPromises()
+    await finishInitialLoading()
 
-    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
 
-    const firstCall = fetchMock.mock.calls[0]
+    const profileCall = fetchMock.mock.calls[0]
+    const searchesCall = fetchMock.mock.calls[1]
 
-    if (!firstCall) {
-      throw new Error("L'appel initial vers Django n'a pas été effectué.")
+    if (!profileCall || !searchesCall) {
+      throw new Error("Les appels initiaux vers Django n'ont pas été effectués.")
     }
 
-    const [url, options] = firstCall
-    const headers = new Headers(options?.headers)
+    const [profileUrl, profileOptions] = profileCall
+    const profileHeaders = new Headers(profileOptions?.headers)
 
-    expect(url).toBe('http://127.0.0.1:8000/api/me/')
-    expect(headers.get('Authorization')).toBe('Bearer jeton-test')
+    expect(profileUrl).toBe('http://127.0.0.1:8000/api/me/')
+    expect(profileHeaders.get('Authorization')).toBe('Bearer jeton-test')
+
+    const [searchesUrl, searchesOptions] = searchesCall
+    const searchesHeaders = new Headers(searchesOptions?.headers)
+
+    expect(searchesUrl).toBe('http://127.0.0.1:8000/api/searches/')
+    expect(searchesHeaders.get('Authorization')).toBe('Bearer jeton-test')
 
     expect(wrapper.text()).toContain('Bonjour Victor')
-    expect(wrapper.text()).toContain('Votre identité a été validée par Django.')
-    expect(wrapper.text()).toContain('utilisateur@example.com')
-    expect(wrapper.text()).toContain('parent')
-    expect(wrapper.text()).toContain('user')
+    expect(wrapper.text()).toContain('Tes recherches de prénoms')
+    expect(wrapper.text()).toContain('Notre futur prénom')
+    expect(wrapper.text()).toContain('Ma recherche')
   })
 
-  it('modifie le nom d’affichage avec PATCH', async () => {
+  it('affiche un état vide lorsque le compte ne possède aucune recherche', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse(profile))
+      .mockResolvedValueOnce(jsonResponse([]))
+
+    vi.stubEnv('VITE_API_URL', 'http://127.0.0.1:8000')
+    vi.stubGlobal('fetch', fetchMock)
+
+    const wrapper = mount(App)
+
+    await finishInitialLoading()
+
+    expect(wrapper.text()).toContain('Ta première recherche commence ici')
+    expect(wrapper.text()).toContain('Créer ma première recherche')
+  })
+
+  it('crée une recherche avec son titre et les genres sélectionnés', async () => {
+    const createdSearch = {
+      ...activeSearch,
+      id: 42,
+      title: 'Prénoms pour bébé',
+    }
+
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse(profile))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse(createdSearch, 201))
+
+    vi.stubEnv('VITE_API_URL', 'http://127.0.0.1:8000')
+    vi.stubGlobal('fetch', fetchMock)
+
+    const wrapper = mount(App)
+
+    await finishInitialLoading()
+
+    await wrapper.get('[data-test="create-search-button"]').trigger('click')
+    await wrapper.get('[data-test="search-title-input"]').setValue('Prénoms pour bébé')
+    await wrapper.get('[data-test="create-search-form"]').trigger('submit')
+
+    await flushPromises()
+
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+
+    const createCall = fetchMock.mock.calls[2]
+
+    if (!createCall) {
+      throw new Error("L'appel de création vers Django n'a pas été effectué.")
+    }
+
+    const [url, options] = createCall
+    const headers = new Headers(options?.headers)
+
+    expect(url).toBe('http://127.0.0.1:8000/api/searches/')
+    expect(options?.method).toBe('POST')
+    expect(options?.body).toBe(
+      JSON.stringify({
+        title: 'Prénoms pour bébé',
+        genders: ['female', 'male', 'mixed'],
+      }),
+    )
+    expect(headers.get('Authorization')).toBe('Bearer jeton-test')
+    expect(headers.get('Content-Type')).toBe('application/json')
+    expect(wrapper.text()).toContain('La recherche « Prénoms pour bébé » a bien été créée.')
+    expect(wrapper.text()).toContain('Prénoms pour bébé')
+  })
+
+  it('refuse localement une création sans titre', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse(profile))
+      .mockResolvedValueOnce(jsonResponse([]))
+
+    vi.stubEnv('VITE_API_URL', 'http://127.0.0.1:8000')
+    vi.stubGlobal('fetch', fetchMock)
+
+    const wrapper = mount(App)
+
+    await finishInitialLoading()
+
+    await wrapper.get('[data-test="create-search-button"]').trigger('click')
+    await wrapper.get('[data-test="create-search-form"]').trigger('submit')
+
+    await flushPromises()
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(wrapper.get('[role="alert"]').text()).toBe('Donne un nom à cette recherche.')
+  })
+
+  it('modifie le nom d’affichage avec PATCH depuis le profil', async () => {
     const updatedProfile = {
       ...profile,
       display_name: 'Nouveau nom',
@@ -90,6 +225,7 @@ describe('App', () => {
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(jsonResponse(profile))
+      .mockResolvedValueOnce(jsonResponse([]))
       .mockResolvedValueOnce(jsonResponse(updatedProfile))
 
     vi.stubEnv('VITE_API_URL', 'http://127.0.0.1:8000')
@@ -97,17 +233,16 @@ describe('App', () => {
 
     const wrapper = mount(App)
 
-    await flushPromises()
-
+    await finishInitialLoading()
+    await wrapper.get('[data-test="profile-navigation"]').trigger('click')
     await wrapper.get('[data-test="display-name-input"]').setValue('Nouveau nom')
-
     await wrapper.get('[data-test="profile-form"]').trigger('submit')
 
     await flushPromises()
 
-    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock).toHaveBeenCalledTimes(3)
 
-    const patchCall = fetchMock.mock.calls[1]
+    const patchCall = fetchMock.mock.calls[2]
 
     if (!patchCall) {
       throw new Error("L'appel PATCH vers Django n'a pas été effectué.")
@@ -125,12 +260,11 @@ describe('App', () => {
     )
     expect(headers.get('Authorization')).toBe('Bearer jeton-test')
     expect(headers.get('Content-Type')).toBe('application/json')
-
     expect(wrapper.text()).toContain('Votre nom d’affichage a bien été enregistré.')
     expect(wrapper.text()).toContain('Bonjour Nouveau nom')
   })
 
-  it('recherche un utilisateur avec son e-mail exact', async () => {
+  it('recherche un utilisateur avec son e-mail exact depuis le profil', async () => {
     const foundProfile = {
       id: 25,
       username: 'autre-utilisateur',
@@ -141,6 +275,7 @@ describe('App', () => {
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(jsonResponse(profile))
+      .mockResolvedValueOnce(jsonResponse([]))
       .mockResolvedValueOnce(jsonResponse(foundProfile))
 
     vi.stubEnv('VITE_API_URL', 'http://127.0.0.1:8000')
@@ -148,17 +283,16 @@ describe('App', () => {
 
     const wrapper = mount(App)
 
-    await flushPromises()
-
+    await finishInitialLoading()
+    await wrapper.get('[data-test="profile-navigation"]').trigger('click')
     await wrapper.get('[data-test="lookup-email-input"]').setValue('autre@example.com')
-
     await wrapper.get('[data-test="lookup-form"]').trigger('submit')
 
     await flushPromises()
 
-    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock).toHaveBeenCalledTimes(3)
 
-    const lookupCall = fetchMock.mock.calls[1]
+    const lookupCall = fetchMock.mock.calls[2]
 
     if (!lookupCall) {
       throw new Error("L'appel de recherche vers Django n'a pas été effectué.")

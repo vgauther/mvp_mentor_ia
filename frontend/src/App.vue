@@ -1,39 +1,19 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 
+import { authenticatedFetch } from './api/client'
+import logoIconUrl from './assets/brand/logo-icon.png'
+import ProfileSettings from './components/ProfileSettings.vue'
+import SearchDashboard from './components/SearchDashboard.vue'
 import keycloak from './auth/keycloak'
+import type { CurrentProfile } from './types/api'
 
-interface CurrentProfile {
-  id: number
-  username: string
-  email: string
-  display_name: string
-  roles: string[]
-  created_at: string
-  updated_at: string
-}
-
-interface ProfileLookup {
-  id: number
-  username: string
-  email: string
-  display_name: string
-}
+type AppSection = 'searches' | 'profile'
 
 const user = ref<CurrentProfile | null>(null)
-const foundProfile = ref<ProfileLookup | null>(null)
-
-const displayName = ref('')
-const lookupEmail = ref('')
-
 const isLoading = ref(true)
-const isSaving = ref(false)
-const isSearching = ref(false)
-
 const loadError = ref('')
-const saveError = ref('')
-const saveSuccess = ref('')
-const lookupError = ref('')
+const activeSection = ref<AppSection>('searches')
 
 const visibleName = computed(() => {
   if (!user.value) {
@@ -57,38 +37,15 @@ const initials = computed(() => {
     .join('')
 })
 
-async function authenticatedFetch(path: string, options: RequestInit = {}) {
-  await keycloak.updateToken(30)
+const pageTitle = computed(() =>
+  activeSection.value === 'searches' ? 'Tes recherches de prénoms' : 'Ton profil',
+)
 
-  if (!keycloak.token) {
-    throw new Error('Aucun jeton Keycloak disponible.')
-  }
-
-  const headers = new Headers(options.headers)
-
-  headers.set('Authorization', `Bearer ${keycloak.token}`)
-
-  if (options.body) {
-    headers.set('Content-Type', 'application/json')
-  }
-
-  return fetch(`${import.meta.env.VITE_API_URL}${path}`, {
-    ...options,
-    headers,
-  })
-}
-
-async function getErrorMessage(response: Response, fallbackMessage: string) {
-  try {
-    const data = (await response.json()) as {
-      detail?: string
-    }
-
-    return data.detail || fallbackMessage
-  } catch {
-    return fallbackMessage
-  }
-}
+const pageDescription = computed(() =>
+  activeSection.value === 'searches'
+    ? 'Crée, partage et retrouve toutes tes recherches au même endroit.'
+    : 'Consulte tes informations et personnalise ton compte.',
+)
 
 async function loadUser() {
   isLoading.value = true
@@ -101,105 +58,17 @@ async function loadUser() {
       throw new Error(`Réponse Django : ${response.status}`)
     }
 
-    const profile = (await response.json()) as CurrentProfile
-
-    user.value = profile
-    displayName.value = profile.display_name || ''
+    user.value = (await response.json()) as CurrentProfile
   } catch (error) {
     console.error("Échec de la récupération de l'utilisateur :", error)
-
     loadError.value = 'Impossible de vérifier votre identité auprès de Django.'
   } finally {
     isLoading.value = false
   }
 }
 
-async function saveDisplayName() {
-  isSaving.value = true
-  saveError.value = ''
-  saveSuccess.value = ''
-
-  try {
-    const response = await authenticatedFetch('/api/me/', {
-      method: 'PATCH',
-      body: JSON.stringify({
-        display_name: displayName.value.trim(),
-      }),
-    })
-
-    if (!response.ok) {
-      saveError.value = await getErrorMessage(
-        response,
-        "Impossible d'enregistrer le nom d'affichage.",
-      )
-      return
-    }
-
-    user.value = (await response.json()) as CurrentProfile
-    displayName.value = user.value.display_name || ''
-    saveSuccess.value = 'Votre nom d’affichage a bien été enregistré.'
-  } catch (error) {
-    console.error('Échec de la modification du profil :', error)
-
-    saveError.value = 'Impossible de contacter Django pour modifier le profil.'
-  } finally {
-    isSaving.value = false
-  }
-}
-
-async function searchProfile() {
-  const email = lookupEmail.value.trim()
-
-  lookupError.value = ''
-  foundProfile.value = null
-
-  if (!email) {
-    lookupError.value = 'Saisissez une adresse e-mail.'
-    return
-  }
-
-  isSearching.value = true
-
-  try {
-    const query = new URLSearchParams({
-      email,
-    })
-
-    const response = await authenticatedFetch(`/api/profiles/lookup/?${query.toString()}`)
-
-    if (!response.ok) {
-      lookupError.value = await getErrorMessage(
-        response,
-        'Aucun utilisateur ne correspond à cette adresse e-mail.',
-      )
-      return
-    }
-
-    foundProfile.value = (await response.json()) as ProfileLookup
-  } catch (error) {
-    console.error('Échec de la recherche du profil :', error)
-
-    lookupError.value = 'Impossible de contacter Django pour effectuer la recherche.'
-  } finally {
-    isSearching.value = false
-  }
-}
-
-function formatDate(value: string | undefined) {
-  if (!value) {
-    return 'Non disponible'
-  }
-
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return 'Non disponible'
-  }
-
-  return new Intl.DateTimeFormat('fr-FR', {
-    dateStyle: 'long',
-    timeStyle: 'short',
-  }).format(date)
+function updateProfile(profile: CurrentProfile) {
+  user.value = profile
 }
 
 async function logout() {
@@ -214,249 +83,103 @@ onMounted(() => {
 </script>
 
 <template>
-  <main class="app-shell">
-    <header class="topbar">
+  <div class="app-shell">
+    <aside class="sidebar">
       <a class="brand" href="/" aria-label="Accueil Le Bon Prénom">
-        <span class="brand-mark">LBP</span>
-
+        <img :src="logoIconUrl" alt="" />
         <span>
           <strong>Le Bon Prénom</strong>
-          <small>Espace de démonstration</small>
+          <small>Trouvez-le ensemble</small>
         </span>
       </a>
 
-      <div class="session-actions">
-        <span v-if="user" class="connected-badge">
-          <span class="status-dot"></span>
-          Connecté
-        </span>
-
-        <button type="button" class="logout-button" @click="logout">Se déconnecter</button>
-      </div>
-    </header>
-
-    <section class="hero">
-      <div>
-        <p class="eyebrow">Compte utilisateur</p>
-
-        <h1>
-          Votre espace personnel,
-          <span>simple et sécurisé.</span>
-        </h1>
-
-        <p class="hero-description">
-          Cette page permet de vérifier visuellement la connexion entre Keycloak, Django et votre
-          base PostgreSQL.
-        </p>
-      </div>
-
-      <div class="architecture">
-        <span>Keycloak</span>
-        <span class="arrow">→</span>
-        <span>Django</span>
-        <span class="arrow">→</span>
-        <span>PostgreSQL</span>
-      </div>
-    </section>
-
-    <section v-if="isLoading" class="state-card" aria-live="polite">
-      <div class="loader"></div>
-
-      <div>
-        <h2>Vérification de votre identité</h2>
-
-        <p>Keycloak transmet votre jeton sécurisé à Django…</p>
-      </div>
-    </section>
-
-    <section v-else-if="loadError" class="state-card error-state">
-      <div class="state-icon">!</div>
-
-      <div>
-        <h2>Connexion impossible</h2>
-
-        <p role="alert">
-          {{ loadError }}
-        </p>
-
-        <button type="button" class="primary-button compact-button" @click="loadUser">
-          Réessayer
+      <nav aria-label="Navigation principale">
+        <button
+          type="button"
+          :class="{ active: activeSection === 'searches' }"
+          data-test="searches-navigation"
+          @click="activeSection = 'searches'"
+        >
+          <span class="nav-icon">♡</span>
+          <span>Mes recherches</span>
         </button>
+
+        <button
+          type="button"
+          :class="{ active: activeSection === 'profile' }"
+          data-test="profile-navigation"
+          @click="activeSection = 'profile'"
+        >
+          <span class="nav-icon">○</span>
+          <span>Mon profil</span>
+        </button>
+      </nav>
+
+      <div v-if="user" class="sidebar-profile">
+        <span class="avatar">{{ initials }}</span>
+        <span>
+          <strong>{{ visibleName }}</strong>
+          <small>{{ user.email || `@${user.username}` }}</small>
+        </span>
       </div>
-    </section>
 
-    <template v-else-if="user">
-      <section class="profile-banner">
-        <div class="avatar">
-          {{ initials }}
-        </div>
+      <button type="button" class="logout-button" @click="logout">
+        <span>↗</span>
+        Se déconnecter
+      </button>
+    </aside>
 
-        <div class="profile-heading">
-          <p class="eyebrow">Profil synchronisé</p>
+    <main class="main-content">
+      <header class="mobile-header">
+        <a class="mobile-brand" href="/" aria-label="Accueil Le Bon Prénom">
+          <img :src="logoIconUrl" alt="" />
+          <strong>Le Bon Prénom</strong>
+        </a>
 
-          <h2>Bonjour {{ visibleName }}</h2>
+        <button type="button" class="mobile-logout" aria-label="Se déconnecter" @click="logout">
+          ↗
+        </button>
+      </header>
 
-          <p>Votre identité a été validée par Django.</p>
-        </div>
-
-        <div class="validation-badge">
-          <span>✓</span>
-          Identité validée
+      <section v-if="isLoading" class="app-state" aria-live="polite">
+        <span class="loader"></span>
+        <div>
+          <h1>Vérification de votre identité</h1>
+          <p>Keycloak transmet votre accès sécurisé à Django…</p>
         </div>
       </section>
 
-      <div class="dashboard-grid">
-        <section class="card">
-          <div class="card-heading">
-            <div>
-              <p class="eyebrow">Informations</p>
-              <h2>Votre compte</h2>
-            </div>
+      <section v-else-if="loadError" class="app-state error-state">
+        <span class="state-symbol">!</span>
+        <div>
+          <h1>Connexion impossible</h1>
+          <p role="alert">{{ loadError }}</p>
+          <button type="button" class="retry-button" @click="loadUser">Réessayer</button>
+        </div>
+      </section>
 
-            <span class="card-icon">01</span>
+      <template v-else-if="user">
+        <header class="page-heading">
+          <div>
+            <p>Bonjour {{ visibleName }} <span aria-hidden="true">👋</span></p>
+            <h1>{{ pageTitle }}</h1>
+            <span>{{ pageDescription }}</span>
           </div>
 
-          <dl class="profile-data">
-            <div>
-              <dt>Nom d’utilisateur</dt>
-              <dd>{{ user.username }}</dd>
-            </div>
+          <span class="connected-badge">
+            <span></span>
+            Connecté
+          </span>
+        </header>
 
-            <div>
-              <dt>Adresse e-mail</dt>
-              <dd>{{ user.email || 'Non renseignée' }}</dd>
-            </div>
+        <SearchDashboard v-if="activeSection === 'searches'" :user-id="user.id" />
 
-            <div>
-              <dt>Identifiant Django</dt>
-              <dd>#{{ user.id }}</dd>
-            </div>
+        <ProfileSettings v-else :user="user" @profile-updated="updateProfile" />
+      </template>
 
-            <div>
-              <dt>Compte créé le</dt>
-              <dd>{{ formatDate(user.created_at) }}</dd>
-            </div>
-          </dl>
-
-          <div class="roles-block">
-            <span class="field-label">Rôles Keycloak</span>
-
-            <div class="role-list">
-              <span v-for="role in user.roles" :key="role" class="role-badge">
-                {{ role }}
-              </span>
-
-              <span v-if="user.roles.length === 0" class="empty-value"> Aucun rôle </span>
-            </div>
-          </div>
-        </section>
-
-        <section class="card">
-          <div class="card-heading">
-            <div>
-              <p class="eyebrow">Personnalisation</p>
-              <h2>Nom d’affichage</h2>
-            </div>
-
-            <span class="card-icon">02</span>
-          </div>
-
-          <p class="card-description">
-            Ce nom est stocké dans Django. Votre nom d’utilisateur et votre e-mail restent
-            administrés par Keycloak.
-          </p>
-
-          <form data-test="profile-form" @submit.prevent="saveDisplayName">
-            <label for="display-name"> Nom affiché dans l’application </label>
-
-            <input
-              id="display-name"
-              v-model="displayName"
-              data-test="display-name-input"
-              type="text"
-              maxlength="150"
-              placeholder="Par exemple : Victor"
-              autocomplete="name"
-            />
-
-            <p v-if="saveError" class="form-message error-message" role="alert">
-              {{ saveError }}
-            </p>
-
-            <p v-if="saveSuccess" class="form-message success-message" role="status">
-              {{ saveSuccess }}
-            </p>
-
-            <button type="submit" class="primary-button" :disabled="isSaving">
-              {{ isSaving ? 'Enregistrement…' : 'Enregistrer le nom' }}
-            </button>
-          </form>
-        </section>
-
-        <section class="card lookup-card">
-          <div class="card-heading">
-            <div>
-              <p class="eyebrow">Préparation des invitations</p>
-              <h2>Rechercher un utilisateur</h2>
-            </div>
-
-            <span class="card-icon">03</span>
-          </div>
-
-          <p class="card-description">
-            La recherche fonctionne uniquement avec une adresse e-mail complète. Elle ne permet pas
-            de parcourir l’ensemble des utilisateurs.
-          </p>
-
-          <form class="lookup-form" data-test="lookup-form" @submit.prevent="searchProfile">
-            <div class="lookup-field">
-              <label for="lookup-email"> Adresse e-mail exacte </label>
-
-              <input
-                id="lookup-email"
-                v-model="lookupEmail"
-                data-test="lookup-email-input"
-                type="email"
-                placeholder="utilisateur@exemple.fr"
-                autocomplete="off"
-              />
-            </div>
-
-            <button type="submit" class="secondary-button" :disabled="isSearching">
-              {{ isSearching ? 'Recherche…' : 'Rechercher' }}
-            </button>
-          </form>
-
-          <p v-if="lookupError" class="form-message error-message" role="alert">
-            {{ lookupError }}
-          </p>
-
-          <article v-if="foundProfile" class="search-result" data-test="lookup-result">
-            <div class="result-avatar">
-              {{ (foundProfile.display_name || foundProfile.username).charAt(0).toUpperCase() }}
-            </div>
-
-            <div>
-              <span>Utilisateur trouvé</span>
-
-              <strong>
-                {{ foundProfile.display_name || foundProfile.username }}
-              </strong>
-
-              <p>
-                {{ foundProfile.email }}
-                · @{{ foundProfile.username }}
-              </p>
-            </div>
-
-            <div class="result-check">✓</div>
-          </article>
-        </section>
-      </div>
-    </template>
-
-    <footer>Démonstration technique · Keycloak · Django REST · Vue.js</footer>
-  </main>
+      <footer class="app-footer">Le Bon Prénom · Keycloak · Django REST · Vue.js</footer>
+    </main>
+  </div>
 </template>
 
 <style scoped>
@@ -464,14 +187,19 @@ onMounted(() => {
   box-sizing: border-box;
 }
 
+:global(html) {
+  min-width: 320px;
+  background: #fff9f0;
+}
+
 :global(body) {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
-  color: #202138;
+  color: #3f2e20;
   background:
-    radial-gradient(circle at top left, rgba(255, 210, 218, 0.72), transparent 34rem),
-    linear-gradient(145deg, #fffaf8 0%, #f7f4ff 100%);
+    radial-gradient(circle at 88% 4%, rgba(163, 223, 241, 0.32), transparent 27rem),
+    radial-gradient(circle at 25% 95%, rgba(255, 192, 101, 0.2), transparent 32rem), #fff9f0;
   font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
 }
 
@@ -491,525 +219,277 @@ button:not(:disabled):hover {
   transform: translateY(-1px);
 }
 
-button:disabled {
-  cursor: wait;
-  opacity: 0.65;
-}
-
 .app-shell {
-  width: min(1180px, calc(100% - 40px));
+  display: grid;
+  grid-template-columns: 255px minmax(0, 1fr);
   min-height: 100vh;
-  margin: 0 auto;
-  padding-bottom: 28px;
 }
 
-.topbar {
+.sidebar {
+  position: sticky;
+  top: 0;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 92px;
-  border-bottom: 1px solid rgba(75, 63, 116, 0.12);
+  height: 100vh;
+  flex-direction: column;
+  padding: 24px 18px 20px;
+  border-right: 1px solid rgba(126, 83, 35, 0.1);
+  background: rgba(255, 253, 248, 0.93);
+  backdrop-filter: blur(18px);
 }
 
-.brand {
+.brand,
+.mobile-brand {
   display: flex;
   align-items: center;
-  gap: 13px;
+  gap: 11px;
   color: inherit;
   text-decoration: none;
 }
 
-.brand-mark {
-  display: grid;
-  width: 46px;
-  height: 46px;
-  place-items: center;
-  color: white;
+.brand img {
+  width: 53px;
+  height: 53px;
   border-radius: 15px;
-  background: #5e51a4;
-  box-shadow: 0 10px 25px rgba(94, 81, 164, 0.23);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  object-fit: cover;
+  box-shadow: 0 10px 24px rgba(238, 137, 27, 0.13);
 }
 
 .brand strong,
-.brand small {
+.brand small,
+.sidebar-profile strong,
+.sidebar-profile small {
   display: block;
 }
 
 .brand strong {
-  font-size: 17px;
+  color: #d87208;
+  font-size: 16px;
+  line-height: 1.1;
 }
 
 .brand small {
-  margin-top: 2px;
-  color: #77738d;
-  font-size: 12px;
-}
-
-.session-actions {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-
-.connected-badge {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #38745a;
-  font-size: 13px;
+  margin-top: 3px;
+  color: #9a806b;
+  font-size: 10px;
   font-weight: 700;
 }
 
-.status-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #45b77e;
-  box-shadow: 0 0 0 4px rgba(69, 183, 126, 0.14);
+nav {
+  display: grid;
+  gap: 7px;
+  margin-top: 42px;
 }
 
-.logout-button {
-  padding: 10px 15px;
-  color: #514977;
-  border: 1px solid rgba(81, 73, 119, 0.2);
-  border-radius: 11px;
-  background: rgba(255, 255, 255, 0.65);
+nav button {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 11px 12px;
+  color: #776353;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
   cursor: pointer;
-  font-weight: 700;
-}
-
-.hero {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 40px;
-  padding: 70px 0 48px;
-}
-
-.eyebrow {
-  margin: 0 0 10px;
-  color: #7667bd;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 800;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
+  text-align: left;
 }
 
-.hero h1 {
-  max-width: 680px;
-  margin: 0;
-  color: #29273d;
-  font-size: clamp(39px, 6vw, 68px);
-  line-height: 0.99;
-  letter-spacing: -0.055em;
+nav button.active {
+  color: #8d500c;
+  background: #fee4b8;
+  box-shadow: inset 3px 0 #ffa43a;
 }
 
-.hero h1 span {
-  color: #7465b7;
+.nav-icon {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  font-size: 20px;
+  font-weight: 900;
 }
 
-.hero-description {
-  max-width: 600px;
-  margin: 24px 0 0;
-  color: #716e7e;
-  font-size: 17px;
-  line-height: 1.65;
-}
-
-.architecture {
+.sidebar-profile {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 14px 17px;
-  border: 1px solid rgba(100, 87, 164, 0.13);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.62);
-  color: #655d81;
+  gap: 10px;
+  margin-top: auto;
+  padding: 15px 9px;
+  border-top: 1px solid #f0e4d7;
+}
+
+.sidebar-profile > span:last-child {
+  min-width: 0;
+}
+
+.avatar {
+  display: grid;
+  width: 39px;
+  height: 39px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: #74430c;
+  border-radius: 13px;
+  background: linear-gradient(145deg, #fee4b8, #ffc065);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 900;
+}
+
+.sidebar-profile strong,
+.sidebar-profile small {
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.arrow {
-  color: #cf7187;
+.sidebar-profile strong {
+  color: #493525;
+  font-size: 12px;
 }
 
-.state-card,
-.profile-banner,
-.card {
-  border: 1px solid rgba(88, 76, 141, 0.12);
-  background: rgba(255, 255, 255, 0.84);
-  box-shadow: 0 24px 60px rgba(72, 61, 111, 0.09);
-  backdrop-filter: blur(18px);
+.sidebar-profile small {
+  margin-top: 3px;
+  color: #9b8878;
+  font-size: 9px;
 }
 
-.state-card {
+.logout-button {
   display: flex;
   align-items: center;
-  gap: 22px;
-  min-height: 180px;
-  padding: 36px;
-  border-radius: 25px;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  color: #7d6958;
+  border: 1px solid #e8dbcf;
+  border-radius: 11px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
 }
 
-.state-card h2,
-.state-card p {
+.main-content {
+  min-width: 0;
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  padding: 42px 42px 22px;
+}
+
+.mobile-header {
+  display: none;
+}
+
+.page-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 29px;
+}
+
+.page-heading p {
+  margin: 0 0 7px;
+  color: #a16f3e;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.page-heading h1 {
   margin: 0;
+  color: #3d2c1f;
+  font-size: clamp(29px, 4vw, 42px);
+  letter-spacing: -0.035em;
 }
 
-.state-card p {
+.page-heading div > span {
+  display: block;
   margin-top: 8px;
-  color: #77738a;
+  color: #897568;
+  font-size: 14px;
 }
 
-.error-state {
-  border-color: rgba(197, 75, 98, 0.2);
+.connected-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  color: #347253;
+  border-radius: 11px;
+  background: #eaf8f0;
+  font-size: 11px;
+  font-weight: 850;
 }
 
-.state-icon {
+.connected-badge > span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4bae78;
+  box-shadow: 0 0 0 4px rgba(75, 174, 120, 0.13);
+}
+
+.app-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  min-height: calc(100vh - 100px);
+  padding: 30px;
+  text-align: left;
+}
+
+.app-state h1 {
+  margin: 0;
+  color: #3e2d20;
+  font-size: 25px;
+}
+
+.app-state p {
+  margin: 8px 0 0;
+  color: #887568;
+}
+
+.loader {
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  border: 4px solid #fee6c2;
+  border-top-color: #f49224;
+  border-radius: 50%;
+  animation: spin 750ms linear infinite;
+}
+
+.state-symbol {
   display: grid;
   width: 48px;
   height: 48px;
   flex: 0 0 auto;
   place-items: center;
-  color: #c54b62;
+  color: #a84444;
   border-radius: 50%;
-  background: #ffeaee;
+  background: #fff0ec;
   font-size: 22px;
   font-weight: 900;
 }
 
-.loader {
-  width: 45px;
-  height: 45px;
-  flex: 0 0 auto;
-  border: 4px solid #ebe7fb;
-  border-top-color: #7465b7;
-  border-radius: 50%;
-  animation: spin 800ms linear infinite;
-}
-
-.profile-banner {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  margin-bottom: 22px;
-  padding: 25px 28px;
-  border-radius: 24px;
-}
-
-.avatar {
-  display: grid;
-  width: 66px;
-  height: 66px;
-  flex: 0 0 auto;
-  place-items: center;
-  color: #514388;
-  border-radius: 21px;
-  background: linear-gradient(145deg, #ffe0e5, #ded7ff);
-  font-size: 23px;
-  font-weight: 900;
-}
-
-.profile-heading {
-  flex: 1;
-}
-
-.profile-heading .eyebrow {
-  margin-bottom: 5px;
-}
-
-.profile-heading h2 {
-  margin: 0;
-  font-size: 25px;
-}
-
-.profile-heading > p:last-child {
-  margin: 5px 0 0;
-  color: #77738a;
-}
-
-.validation-badge {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 13px;
-  color: #367557;
-  border-radius: 12px;
-  background: #eaf8f0;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.validation-badge span {
-  display: grid;
-  width: 20px;
-  height: 20px;
-  place-items: center;
-  color: white;
-  border-radius: 50%;
-  background: #46a873;
-  font-size: 12px;
-}
-
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 22px;
-}
-
-.card {
-  padding: 30px;
-  border-radius: 24px;
-}
-
-.lookup-card {
-  grid-column: 1 / -1;
-}
-
-.card-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 20px;
-  margin-bottom: 24px;
-}
-
-.card-heading .eyebrow {
-  margin-bottom: 6px;
-}
-
-.card-heading h2 {
-  margin: 0;
-  font-size: 22px;
-}
-
-.card-icon {
-  color: #a19ab9;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-}
-
-.card-description {
-  max-width: 610px;
-  margin: -8px 0 23px;
-  color: #77738a;
-  font-size: 14px;
-  line-height: 1.65;
-}
-
-.profile-data {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin: 0;
-  border-top: 1px solid #edeaf3;
-}
-
-.profile-data div {
-  min-width: 0;
-  padding: 17px 12px 17px 0;
-  border-bottom: 1px solid #edeaf3;
-}
-
-.profile-data dt,
-.field-label,
-label {
-  display: block;
-  margin-bottom: 7px;
-  color: #8a8599;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
-.profile-data dd {
-  overflow: hidden;
-  margin: 0;
-  color: #353246;
-  font-size: 14px;
-  font-weight: 750;
-  text-overflow: ellipsis;
-}
-
-.roles-block {
-  margin-top: 21px;
-}
-
-.role-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.role-badge {
-  padding: 7px 10px;
-  color: #61549c;
-  border-radius: 9px;
-  background: #f0edfb;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.empty-value {
-  color: #918c9f;
-  font-size: 13px;
-}
-
-input {
-  width: 100%;
-  padding: 13px 14px;
-  color: #302d40;
-  border: 1px solid #dcd7e8;
-  border-radius: 11px;
-  outline: none;
-  background: #fff;
-  transition:
-    border-color 150ms ease,
-    box-shadow 150ms ease;
-}
-
-input:focus {
-  border-color: #8474c6;
-  box-shadow: 0 0 0 4px rgba(132, 116, 198, 0.13);
-}
-
-.primary-button,
-.secondary-button {
+.retry-button {
   margin-top: 16px;
-  padding: 12px 17px;
+  padding: 10px 15px;
+  color: #fff;
+  border: 0;
   border-radius: 11px;
+  background: #f49224;
   cursor: pointer;
-  font-weight: 800;
+  font-weight: 850;
 }
 
-.primary-button {
-  color: white;
-  border: 0;
-  background: #6555a6;
-  box-shadow: 0 10px 22px rgba(101, 85, 166, 0.2);
-}
-
-.secondary-button {
-  min-width: 140px;
-  color: white;
-  border: 0;
-  background: #cf7187;
-  box-shadow: 0 10px 22px rgba(207, 113, 135, 0.2);
-}
-
-.compact-button {
-  margin-top: 16px;
-}
-
-.form-message {
-  margin: 13px 0 0;
-  padding: 10px 12px;
-  border-radius: 9px;
-  font-size: 13px;
-  font-weight: 650;
-}
-
-.error-message {
-  color: #a93d52;
-  background: #fff0f2;
-}
-
-.success-message {
-  color: #327152;
-  background: #eaf8f0;
-}
-
-.lookup-form {
-  display: flex;
-  align-items: flex-end;
-  gap: 13px;
-}
-
-.lookup-field {
-  flex: 1;
-}
-
-.lookup-form .secondary-button {
-  margin-top: 0;
-}
-
-.search-result {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  margin-top: 21px;
-  padding: 17px;
-  border: 1px solid #dcecdf;
-  border-radius: 15px;
-  background: #f6fcf8;
-}
-
-.result-avatar {
-  display: grid;
-  width: 45px;
-  height: 45px;
-  flex: 0 0 auto;
-  place-items: center;
-  color: white;
-  border-radius: 14px;
-  background: #55a67a;
-  font-weight: 900;
-}
-
-.search-result > div:nth-child(2) {
-  min-width: 0;
-  flex: 1;
-}
-
-.search-result span,
-.search-result strong,
-.search-result p {
-  display: block;
-}
-
-.search-result span {
-  margin-bottom: 3px;
-  color: #5f8e71;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.search-result strong {
-  color: #2e4938;
-}
-
-.search-result p {
-  overflow: hidden;
-  margin: 4px 0 0;
-  color: #658171;
-  font-size: 13px;
-  text-overflow: ellipsis;
-}
-
-.result-check {
-  display: grid;
-  width: 31px;
-  height: 31px;
-  flex: 0 0 auto;
-  place-items: center;
-  color: #397855;
-  border-radius: 50%;
-  background: #dff3e6;
-  font-weight: 900;
-}
-
-footer {
-  padding: 35px 0 5px;
-  color: #9994a5;
+.app-footer {
+  padding: 30px 0 5px;
+  color: #aa9584;
+  font-size: 10px;
   text-align: center;
-  font-size: 12px;
 }
 
 @keyframes spin {
@@ -1018,85 +498,76 @@ footer {
   }
 }
 
-@media (max-width: 820px) {
-  .hero {
+@media (max-width: 920px) {
+  .app-shell {
     display: block;
-    padding-top: 50px;
   }
 
-  .architecture {
-    width: fit-content;
-    margin-top: 28px;
+  .sidebar {
+    display: none;
   }
 
-  .dashboard-grid {
-    grid-template-columns: 1fr;
+  .main-content {
+    padding: 0 24px 22px;
   }
 
-  .lookup-card {
-    grid-column: auto;
+  .mobile-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 76px;
+    margin-bottom: 25px;
+    border-bottom: 1px solid #eddfd1;
   }
 
-  .profile-banner {
+  .mobile-brand img {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    object-fit: cover;
+  }
+
+  .mobile-brand strong {
+    color: #d87208;
+    font-size: 15px;
+  }
+
+  .mobile-logout {
+    display: grid;
+    width: 39px;
+    height: 39px;
+    place-items: center;
+    color: #7d6958;
+    border: 1px solid #e5d7c9;
+    border-radius: 11px;
+    background: #fff;
+  }
+
+  .page-heading::after {
+    content: '';
+  }
+
+  .page-heading {
     align-items: flex-start;
-    flex-wrap: wrap;
-  }
-
-  .validation-badge {
-    margin-left: 86px;
   }
 }
 
-@media (max-width: 590px) {
-  .app-shell {
-    width: min(100% - 24px, 1180px);
+@media (max-width: 600px) {
+  .main-content {
+    padding: 0 15px 18px;
   }
 
-  .topbar {
-    min-height: 76px;
-  }
-
-  .brand small,
   .connected-badge {
     display: none;
   }
 
-  .hero {
-    padding: 42px 0 35px;
+  .page-heading h1 {
+    font-size: 30px;
   }
 
-  .hero h1 {
-    font-size: 40px;
-  }
-
-  .architecture {
-    max-width: 100%;
-    overflow-x: auto;
-  }
-
-  .profile-banner,
-  .card,
-  .state-card {
-    padding: 22px;
-    border-radius: 19px;
-  }
-
-  .validation-badge {
-    width: 100%;
-    margin-left: 0;
-  }
-
-  .profile-data {
-    grid-template-columns: 1fr;
-  }
-
-  .lookup-form {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .lookup-form .secondary-button {
-    width: 100%;
+  .app-state {
+    min-height: calc(100vh - 120px);
+    padding: 20px 0;
   }
 }
 </style>
