@@ -42,12 +42,20 @@ const isSearchingProfile = ref(false)
 const isSendingInvitation = ref(false)
 const invitationError = ref('')
 const invitationSuccess = ref('')
+const isEditingSearch = ref(false)
+const editTitle = ref('')
+const editGenders = ref<SearchGender[]>([])
+const isSavingSearch = ref(false)
+const editError = ref('')
+const editSuccess = ref('')
 
 const genderLabels: Record<SearchGender, string> = {
   female: 'Féminin',
   male: 'Masculin',
   mixed: 'Mixte',
 }
+
+const genderOptions: SearchGender[] = ['female', 'male', 'mixed']
 
 const currentParticipant = computed(() =>
   currentSearch.value.participants.find(
@@ -97,6 +105,9 @@ watch(
     currentSearch.value = search
 
     if (searchChanged) {
+      isEditingSearch.value = false
+      editError.value = ''
+      editSuccess.value = ''
       isViewingLikedFirstNames.value = false
       likedFirstNames.value = []
       likedFirstNamesError.value = ''
@@ -140,7 +151,7 @@ async function loadLikedFirstNames() {
     if (!response.ok) {
       likedFirstNamesError.value = await getErrorMessage(
         response,
-        'Impossible de charger les prénoms aimés de cette recherche.',
+        'Impossible de charger tes prénoms aimés.',
       )
       return
     }
@@ -148,7 +159,7 @@ async function loadLikedFirstNames() {
     likedFirstNames.value = (await response.json()) as FirstName[]
   } catch (error) {
     console.error('Échec du chargement des prénoms aimés :', error)
-    likedFirstNamesError.value = 'Impossible de contacter Django pour charger les prénoms aimés.'
+    likedFirstNamesError.value = 'Impossible de contacter Django pour charger tes prénoms aimés.'
   } finally {
     isLoadingLikedFirstNames.value = false
   }
@@ -241,6 +252,87 @@ function resetInvitationForm() {
   foundProfile.value = null
   invitationError.value = ''
   invitationSuccess.value = ''
+}
+
+function openSearchEditor() {
+  if (!isOwner.value) {
+    return
+  }
+
+  editTitle.value = currentSearch.value.title
+  editGenders.value = [...currentSearch.value.genders]
+  editError.value = ''
+  editSuccess.value = ''
+  isEditingSearch.value = true
+}
+
+function closeSearchEditor() {
+  if (isSavingSearch.value) {
+    return
+  }
+
+  isEditingSearch.value = false
+  editError.value = ''
+}
+
+function toggleEditGender(gender: SearchGender) {
+  editError.value = ''
+
+  if (editGenders.value.includes(gender)) {
+    editGenders.value = editGenders.value.filter((selectedGender) => selectedGender !== gender)
+    return
+  }
+
+  editGenders.value = [...editGenders.value, gender]
+}
+
+async function saveSearchDetails() {
+  const title = editTitle.value.trim()
+
+  editError.value = ''
+  editSuccess.value = ''
+
+  if (!title) {
+    editError.value = 'Donne un titre à cette recherche.'
+    return
+  }
+
+  if (editGenders.value.length === 0) {
+    editError.value = 'Sélectionne au moins un type de prénom.'
+    return
+  }
+
+  isSavingSearch.value = true
+
+  try {
+    const response = await authenticatedFetch(`/api/searches/${currentSearch.value.id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        title,
+        genders: editGenders.value,
+      }),
+    })
+
+    if (!response.ok) {
+      editError.value = await getErrorMessage(
+        response,
+        'Impossible de modifier les informations de cette recherche.',
+      )
+      return
+    }
+
+    const updatedSearch = (await response.json()) as NameSearch
+
+    currentSearch.value = updatedSearch
+    isEditingSearch.value = false
+    editSuccess.value = 'Les informations de la recherche ont bien été enregistrées.'
+    emit('searchUpdated', updatedSearch)
+  } catch (error) {
+    console.error('Échec de la modification de la recherche :', error)
+    editError.value = 'Impossible de contacter Django pour modifier cette recherche.'
+  } finally {
+    isSavingSearch.value = false
+  }
 }
 
 function updateInvitationEmail() {
@@ -399,7 +491,7 @@ async function updateStatus(newStatus: SearchStatus) {
       @back="closeNameBrowser"
     />
 
-    <section v-else-if="isViewingLikedFirstNames" class="liked-view">
+    <section v-else-if="isViewingLikedFirstNames" class="matches-view">
       <button
         type="button"
         class="back-button"
@@ -410,26 +502,27 @@ async function updateStatus(newStatus: SearchStatus) {
         Retour à la recherche
       </button>
 
-      <section class="liked-hero">
+      <section class="matches-hero">
         <div>
-          <p class="eyebrow">Ta sélection personnelle</p>
-          <h2>Les prénoms que tu aimes</h2>
+          <p class="eyebrow">Ma sélection</p>
+          <h2>Mes prénoms aimés dans « {{ currentSearch.title }} »</h2>
           <p>
-            Retrouve tous les prénoms que tu as aimés dans « {{ currentSearch.title }} ». Cette
-            liste contient uniquement tes propres choix.
+            Retrouve ici tous les prénoms que tu as aimés pendant ton parcours dans cette recherche.
           </p>
         </div>
 
-        <div class="liked-total" aria-live="polite">
+        <div class="match-total" aria-live="polite">
           <strong>{{ isLoadingLikedFirstNames ? '…' : likedFirstNames.length }}</strong>
-          <span>{{ likedFirstNames.length > 1 ? 'prénoms aimés' : 'prénom aimé' }}</span>
+          <span>
+            {{ likedFirstNames.length > 1 ? 'prénoms aimés' : 'prénom aimé' }}
+          </span>
         </div>
       </section>
 
       <div class="matches-toolbar">
         <div>
-          <span class="section-kicker">Ta liste</span>
-          <h3>Prénoms conservés</h3>
+          <span class="section-kicker">Sélection personnelle</span>
+          <h3>Les prénoms que tu as conservés</h3>
         </div>
         <button
           type="button"
@@ -443,10 +536,10 @@ async function updateStatus(newStatus: SearchStatus) {
       </div>
 
       <div v-if="isLoadingLikedFirstNames" class="matches-state" role="status">
-        <span class="loading-liked">✓</span>
+        <span class="loading-heart">♥</span>
         <div>
           <strong>Chargement de tes prénoms aimés…</strong>
-          <p>Nous récupérons les prénoms que tu as conservés dans cette recherche.</p>
+          <p>Nous récupérons les prénoms que tu as conservés pour cette recherche.</p>
         </div>
       </div>
 
@@ -464,10 +557,10 @@ async function updateStatus(newStatus: SearchStatus) {
         <div>
           <strong>Tu n’as encore aimé aucun prénom</strong>
           <p v-if="currentSearch.status === 'active'">
-            Parcours les propositions de cette recherche et utilise le bouton « J’aime » pour
-            constituer ta sélection.
+            Parcours les propositions et utilise le bouton « J’aime » : tes choix apparaîtront
+            ensuite ici.
           </p>
-          <p v-else>Aucun prénom n’a été conservé avant la fin de cette recherche.</p>
+          <p v-else>Aucun prénom aimé n’a été enregistré dans cette recherche.</p>
         </div>
       </div>
 
@@ -475,23 +568,25 @@ async function updateStatus(newStatus: SearchStatus) {
         <article
           v-for="(firstName, index) in likedFirstNames"
           :key="firstName.id"
-          class="match-card liked-card"
+          class="match-card"
         >
           <div class="match-card-heading">
             <span class="match-number">{{ String(index + 1).padStart(2, '0') }}</span>
-            <span class="liked-check">✓</span>
+            <span class="match-heart">♥</span>
           </div>
 
           <h3>{{ firstName.name }}</h3>
 
-          <div class="match-tags liked-tags">
+          <div class="match-tags">
             <span>{{ genderLabels[firstName.gender] }}</span>
             <span>{{ firstName.origin || 'Origine non renseignée' }}</span>
           </div>
 
           <div class="meaning-block">
             <span>Signification</span>
-            <p>{{ firstName.meaning || 'Aucune signification renseignée pour ce prénom.' }}</p>
+            <p>
+              {{ firstName.meaning || 'Aucune signification renseignée pour ce prénom.' }}
+            </p>
           </div>
         </article>
       </div>
@@ -591,7 +686,9 @@ async function updateStatus(newStatus: SearchStatus) {
 
           <div class="meaning-block">
             <span>Signification</span>
-            <p>{{ firstName.meaning || 'Aucune signification renseignée pour ce prénom.' }}</p>
+            <p>
+              {{ firstName.meaning || 'Aucune signification renseignée pour ce prénom.' }}
+            </p>
           </div>
         </article>
       </div>
@@ -629,8 +726,84 @@ async function updateStatus(newStatus: SearchStatus) {
           <strong>{{ formatDate(currentSearch.created_at) }}</strong>
           <span>Dernière modification</span>
           <strong>{{ formatDate(currentSearch.updated_at) }}</strong>
+          <button
+            v-if="isOwner"
+            type="button"
+            class="edit-search-button"
+            data-test="edit-search-button"
+            @click="openSearchEditor"
+          >
+            Modifier la recherche
+          </button>
         </div>
       </section>
+
+      <section v-if="isEditingSearch" class="panel edit-search-panel">
+        <div class="panel-heading">
+          <div>
+            <span class="section-kicker">Informations</span>
+            <h3>Modifier la recherche</h3>
+          </div>
+        </div>
+
+        <form data-test="edit-search-form" @submit.prevent="saveSearchDetails">
+          <label for="edit-search-title">Titre de la recherche</label>
+          <input
+            id="edit-search-title"
+            v-model="editTitle"
+            data-test="edit-search-title"
+            type="text"
+            maxlength="150"
+            autocomplete="off"
+            :disabled="isSavingSearch"
+          />
+
+          <fieldset>
+            <legend>Types de prénoms recherchés</legend>
+            <div class="edit-gender-grid">
+              <label v-for="gender in genderOptions" :key="gender">
+                <input
+                  type="checkbox"
+                  :value="gender"
+                  :checked="editGenders.includes(gender)"
+                  :disabled="isSavingSearch"
+                  :data-test="`edit-search-gender-${gender}`"
+                  @change="toggleEditGender(gender)"
+                />
+                <span>{{ genderLabels[gender] }}</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <p v-if="editError" class="edit-search-error" role="alert">
+            {{ editError }}
+          </p>
+
+          <div class="edit-search-actions">
+            <button
+              type="button"
+              class="secondary-action"
+              :disabled="isSavingSearch"
+              data-test="cancel-edit-search"
+              @click="closeSearchEditor"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              class="primary-action"
+              :disabled="isSavingSearch"
+              data-test="save-search-details"
+            >
+              {{ isSavingSearch ? 'Enregistrement…' : 'Enregistrer les modifications' }}
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <p v-if="editSuccess" class="feedback success-feedback" role="status">
+        {{ editSuccess }}
+      </p>
 
       <p v-if="statusSuccess" class="feedback success-feedback" role="status">
         {{ statusSuccess }}
@@ -882,8 +1055,7 @@ async function updateStatus(newStatus: SearchStatus) {
   gap: 20px;
 }
 
-.matches-view,
-.liked-view {
+.matches-view {
   display: grid;
   gap: 20px;
 }
@@ -908,7 +1080,6 @@ async function updateStatus(newStatus: SearchStatus) {
 .hero-card,
 .panel,
 .features-section,
-.liked-hero,
 .matches-hero,
 .matches-state,
 .match-card {
@@ -918,7 +1089,6 @@ async function updateStatus(newStatus: SearchStatus) {
   box-shadow: 0 18px 45px rgba(119, 82, 38, 0.07);
 }
 
-.liked-hero,
 .matches-hero {
   display: flex;
   align-items: center;
@@ -930,13 +1100,6 @@ async function updateStatus(newStatus: SearchStatus) {
     linear-gradient(135deg, rgba(255, 255, 255, 0.97), rgba(255, 249, 239, 0.97));
 }
 
-.liked-hero {
-  background:
-    radial-gradient(circle at 94% 12%, rgba(163, 223, 241, 0.48), transparent 14rem),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.97), rgba(241, 251, 254, 0.97));
-}
-
-.liked-hero h2,
 .matches-hero h2 {
   margin: 4px 0 12px;
   color: #4a3421;
@@ -944,7 +1107,6 @@ async function updateStatus(newStatus: SearchStatus) {
   line-height: 1.1;
 }
 
-.liked-hero > div:first-child > p:last-child,
 .matches-hero > div:first-child > p:last-child {
   max-width: 690px;
   margin: 0;
@@ -952,7 +1114,6 @@ async function updateStatus(newStatus: SearchStatus) {
   line-height: 1.65;
 }
 
-.liked-total,
 .match-total {
   display: grid;
   min-width: 155px;
@@ -964,18 +1125,11 @@ async function updateStatus(newStatus: SearchStatus) {
   background: rgba(255, 255, 255, 0.75);
 }
 
-.liked-total {
-  color: #24758d;
-  border-color: rgba(36, 117, 141, 0.14);
-}
-
-.liked-total strong,
 .match-total strong {
   font-size: 2.4rem;
   line-height: 1;
 }
 
-.liked-total span,
 .match-total span {
   margin-top: 7px;
   font-size: 0.76rem;
@@ -1051,15 +1205,6 @@ async function updateStatus(newStatus: SearchStatus) {
   animation: heart-pulse 1.1s ease-in-out infinite;
 }
 
-.loading-liked {
-  animation: liked-pulse 1.1s ease-in-out infinite;
-}
-
-.matches-state > .loading-liked {
-  color: #24758d;
-  background: #dff4fa;
-}
-
 .error-state > span {
   color: #a13e30;
   background: #fff0ed;
@@ -1103,28 +1248,6 @@ async function updateStatus(newStatus: SearchStatus) {
   background: #fee4b8;
 }
 
-.liked-check {
-  display: grid;
-  width: 37px;
-  height: 37px;
-  place-items: center;
-  border-radius: 12px;
-  color: #24758d;
-  background: #dff4fa;
-  font-weight: 900;
-}
-
-.liked-card {
-  background:
-    radial-gradient(circle at 100% 0, rgba(163, 223, 241, 0.28), transparent 10rem),
-    rgba(255, 255, 255, 0.92);
-}
-
-.match-tags.liked-tags span {
-  color: #286d81;
-  background: #e6f7fb;
-}
-
 .match-card h3 {
   margin: 0;
   color: #4a3421;
@@ -1166,17 +1289,6 @@ async function updateStatus(newStatus: SearchStatus) {
 }
 
 @keyframes heart-pulse {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-
-  50% {
-    transform: scale(1.12);
-  }
-}
-
-@keyframes liked-pulse {
   0%,
   100% {
     transform: scale(1);
@@ -1308,6 +1420,120 @@ async function updateStatus(newStatus: SearchStatus) {
 .hero-meta strong {
   color: #4d3a29;
   font-size: 0.92rem;
+}
+
+.edit-search-button {
+  min-height: 40px;
+  margin-top: 15px;
+  padding: 0 14px;
+  border: 1px solid #d9c2aa;
+  border-radius: 11px;
+  color: #6f5742;
+  background: #fffaf3;
+  cursor: pointer;
+  font-weight: 850;
+}
+
+.edit-search-panel form {
+  display: grid;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.edit-search-panel form > label,
+.edit-search-panel legend {
+  color: #5d4937;
+  font-size: 0.84rem;
+  font-weight: 850;
+}
+
+.edit-search-panel form > input {
+  width: 100%;
+  min-height: 46px;
+  box-sizing: border-box;
+  padding: 0 14px;
+  border: 1px solid #dfcdbb;
+  border-radius: 12px;
+  color: #4d3a29;
+  background: #fffdf9;
+  font: inherit;
+}
+
+.edit-search-panel form > input:focus {
+  border-color: #efa04d;
+  outline: 3px solid rgba(239, 160, 77, 0.16);
+}
+
+.edit-search-panel fieldset {
+  padding: 0;
+  border: 0;
+}
+
+.edit-search-panel legend {
+  margin-bottom: 10px;
+}
+
+.edit-gender-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.edit-gender-grid label {
+  cursor: pointer;
+}
+
+.edit-gender-grid input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.edit-gender-grid span {
+  display: grid;
+  min-height: 43px;
+  place-items: center;
+  border: 1px solid #e5d6c7;
+  border-radius: 12px;
+  color: #765f4a;
+  background: #fffaf4;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.edit-gender-grid input:checked + span {
+  border-color: #eda14f;
+  color: #85511e;
+  background: #fff0d8;
+}
+
+.edit-gender-grid input:focus-visible + span {
+  outline: 3px solid rgba(239, 160, 77, 0.22);
+}
+
+.edit-search-error {
+  margin: 0;
+  color: #a13e30;
+  font-weight: 750;
+}
+
+.edit-search-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.edit-search-actions button {
+  min-height: 44px;
+  padding: 0 17px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 850;
+}
+
+.edit-search-actions button:disabled {
+  cursor: wait;
+  opacity: 0.62;
 }
 
 .feedback {
@@ -1696,14 +1922,12 @@ async function updateStatus(newStatus: SearchStatus) {
     padding: 22px;
   }
 
-  .matches-hero,
-  .liked-hero {
+  .matches-hero {
     display: grid;
     padding: 22px;
   }
 
-  .match-total,
-  .liked-total {
+  .match-total {
     min-width: 0;
   }
 
@@ -1713,6 +1937,14 @@ async function updateStatus(newStatus: SearchStatus) {
 
   .hero-meta {
     min-width: 0;
+  }
+
+  .edit-gender-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .edit-search-actions {
+    display: grid;
   }
 
   .panel,
