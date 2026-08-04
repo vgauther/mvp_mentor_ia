@@ -4,12 +4,13 @@ import { computed, onMounted, ref } from 'vue'
 import { authenticatedFetch } from './api/client'
 import logoIconUrl from './assets/brand/logo-icon.png'
 import keycloak from './auth/keycloak'
+import InvitationsDashboard from './components/InvitationsDashboard.vue'
 import ProfileSettings from './components/ProfileSettings.vue'
 import SearchDashboard from './components/SearchDashboard.vue'
 import SearchDetail from './components/SearchDetail.vue'
 import type { CurrentProfile, NameSearch } from './types/api'
 
-type AppSection = 'searches' | 'profile'
+type AppSection = 'searches' | 'invitations' | 'profile'
 
 const user = ref<CurrentProfile | null>(null)
 const isLoading = ref(true)
@@ -44,6 +45,10 @@ const pageTitle = computed(() => {
     return 'Ton profil'
   }
 
+  if (activeSection.value === 'invitations') {
+    return 'Tes invitations'
+  }
+
   if (selectedSearch.value) {
     return 'Détail de ta recherche'
   }
@@ -54,6 +59,10 @@ const pageTitle = computed(() => {
 const pageDescription = computed(() => {
   if (activeSection.value === 'profile') {
     return 'Consulte tes informations et personnalise ton compte.'
+  }
+
+  if (activeSection.value === 'invitations') {
+    return 'Retrouve les recherches auxquelles un autre utilisateur t’invite à participer.'
   }
 
   if (selectedSearch.value) {
@@ -90,6 +99,11 @@ function showSearches() {
 
 function showProfile() {
   activeSection.value = 'profile'
+  selectedSearch.value = null
+}
+
+function showInvitations() {
+  activeSection.value = 'invitations'
   selectedSearch.value = null
 }
 
@@ -138,6 +152,16 @@ onMounted(() => {
       <nav aria-label="Navigation principale">
         <button
           type="button"
+          :class="{ active: activeSection === 'invitations' }"
+          data-test="invitations-navigation"
+          @click="showInvitations"
+        >
+          <span class="nav-icon">✉</span>
+          <span>Mes invitations</span>
+        </button>
+
+        <button
+          type="button"
           :class="{ active: activeSection === 'searches' }"
           data-test="searches-navigation"
           @click="showSearches"
@@ -181,20 +205,30 @@ onMounted(() => {
 
         <div class="mobile-actions">
           <button
-            v-if="activeSection === 'profile'"
             type="button"
             class="mobile-navigation"
             aria-label="Afficher mes recherches"
+            :class="{ active: activeSection === 'searches' }"
             @click="showSearches"
           >
             ♡
           </button>
 
           <button
-            v-else
+            type="button"
+            class="mobile-navigation"
+            aria-label="Afficher mes invitations"
+            :class="{ active: activeSection === 'invitations' }"
+            @click="showInvitations"
+          >
+            ✉
+          </button>
+
+          <button
             type="button"
             class="mobile-navigation"
             aria-label="Afficher mon profil"
+            :class="{ active: activeSection === 'profile' }"
             @click="showProfile"
           >
             ○
@@ -263,6 +297,8 @@ onMounted(() => {
           :user-id="user.id"
           @open-search="openSearch"
         />
+
+        <InvitationsDashboard v-else-if="activeSection === 'invitations'" />
 
         <ProfileSettings
           v-else
@@ -609,6 +645,10 @@ nav button.active {
 }
 
 .mobile-navigation {
+  color: #7d6958;
+}
+
+.mobile-navigation.active {
   color: #8d500c;
   background: #fff5e5;
 }

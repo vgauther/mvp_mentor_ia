@@ -44,6 +44,25 @@ export interface NameSearchParticipant {
   updated_at: string
 }
 
+export interface InvitationSearchSummary {
+  id: number
+  title: string
+  status: SearchStatus
+  creator: ProfileSummary
+}
+
+export interface SearchInvitation {
+  id: number
+  search: InvitationSearchSummary
+  profile: ProfileSummary
+  role: ParticipantRole
+  role_label: string
+  invitation_status: InvitationStatus
+  invitation_status_label: string
+  created_at: string
+  updated_at: string
+}
+
 export interface NameSearch {
   id: number
   title: string

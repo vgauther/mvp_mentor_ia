@@ -6,6 +6,8 @@ import type {
   FirstName,
   NameSearch,
   NameSearchParticipant,
+  ProfileLookup,
+  SearchInvitation,
   SearchGender,
   SearchStatus,
 } from '../types/api'
@@ -30,6 +32,12 @@ const isViewingMatches = ref(false)
 const matches = ref<FirstName[]>([])
 const isLoadingMatches = ref(false)
 const matchesError = ref('')
+const invitationEmail = ref('')
+const foundProfile = ref<ProfileLookup | null>(null)
+const isSearchingProfile = ref(false)
+const isSendingInvitation = ref(false)
+const invitationError = ref('')
+const invitationSuccess = ref('')
 
 const genderLabels: Record<SearchGender, string> = {
   female: 'Féminin',
@@ -58,6 +66,14 @@ const pendingParticipants = computed(() =>
   ),
 )
 
+const canInviteParticipant = computed(
+  () =>
+    isOwner.value &&
+    currentSearch.value.status === 'active' &&
+    acceptedParticipants.value.length === 1 &&
+    pendingParticipants.value.length === 0,
+)
+
 const statusDescription = computed(() => {
   if (currentSearch.value.status === 'active') {
     return 'La recherche est ouverte : les participants peuvent encore parcourir et choisir des prénoms.'
@@ -80,6 +96,7 @@ watch(
       isViewingMatches.value = false
       matches.value = []
       matchesError.value = ''
+      resetInvitationForm()
     }
 
     if (search.status !== 'active') {
@@ -169,6 +186,127 @@ function formatDate(value: string) {
     month: 'long',
     year: 'numeric',
   }).format(date)
+}
+
+function resetInvitationForm() {
+  invitationEmail.value = ''
+  foundProfile.value = null
+  invitationError.value = ''
+  invitationSuccess.value = ''
+}
+
+function updateInvitationEmail() {
+  foundProfile.value = null
+  invitationError.value = ''
+  invitationSuccess.value = ''
+}
+
+async function searchProfileToInvite() {
+  const email = invitationEmail.value.trim()
+
+  foundProfile.value = null
+  invitationError.value = ''
+  invitationSuccess.value = ''
+
+  if (!email) {
+    invitationError.value = 'Saisis l’adresse e-mail de la personne à inviter.'
+    return
+  }
+
+  isSearchingProfile.value = true
+
+  try {
+    const query = new URLSearchParams({ email })
+    const response = await authenticatedFetch(`/api/profiles/lookup/?${query.toString()}`)
+
+    if (!response.ok) {
+      invitationError.value = await getErrorMessage(
+        response,
+        'Aucun utilisateur ne correspond à cette adresse e-mail.',
+      )
+      return
+    }
+
+    const profile = (await response.json()) as ProfileLookup
+
+    if (profile.id === props.userId) {
+      invitationError.value = 'Tu ne peux pas t’inviter dans ta propre recherche.'
+      return
+    }
+
+    foundProfile.value = profile
+  } catch (error) {
+    console.error('Échec de la recherche du profil à inviter :', error)
+    invitationError.value = 'Impossible de contacter Django pour rechercher cet utilisateur.'
+  } finally {
+    isSearchingProfile.value = false
+  }
+}
+
+async function sendInvitation() {
+  if (!foundProfile.value || !canInviteParticipant.value) {
+    return
+  }
+
+  isSendingInvitation.value = true
+  invitationError.value = ''
+  invitationSuccess.value = ''
+
+  try {
+    const response = await authenticatedFetch(
+      `/api/searches/${currentSearch.value.id}/invitations/`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ profile_id: foundProfile.value.id }),
+      },
+    )
+
+    if (!response.ok) {
+      invitationError.value = await getErrorMessage(
+        response,
+        'Impossible d’envoyer cette invitation.',
+      )
+      return
+    }
+
+    const invitation = (await response.json()) as SearchInvitation
+    const participant: NameSearchParticipant = {
+      id: invitation.id,
+      profile: invitation.profile,
+      role: invitation.role,
+      role_label: invitation.role_label,
+      invitation_status: invitation.invitation_status,
+      invitation_status_label: invitation.invitation_status_label,
+      created_at: invitation.created_at,
+      updated_at: invitation.updated_at,
+    }
+    const existingParticipantIndex = currentSearch.value.participants.findIndex(
+      (currentParticipant) => currentParticipant.id === participant.id,
+    )
+    const participants = [...currentSearch.value.participants]
+
+    if (existingParticipantIndex >= 0) {
+      participants.splice(existingParticipantIndex, 1, participant)
+    } else {
+      participants.push(participant)
+    }
+
+    const updatedSearch: NameSearch = {
+      ...currentSearch.value,
+      participants,
+    }
+
+    currentSearch.value = updatedSearch
+    invitationEmail.value = ''
+    foundProfile.value = null
+    invitationSuccess.value = 'L’invitation a bien été envoyée.'
+    emit('searchUpdated', updatedSearch)
+  } catch (error) {
+    console.error('Échec de l’envoi de l’invitation :', error)
+    invitationError.value = 'Impossible de contacter Django pour envoyer cette invitation.'
+  } finally {
+    isSendingInvitation.value = false
+  }
 }
 
 async function updateStatus(newStatus: SearchStatus) {
@@ -395,9 +533,85 @@ async function updateStatus(newStatus: SearchStatus) {
               <span>+</span>
               <div>
                 <strong>Aucun second participant</strong>
-                <p>L’invitation d’un proche sera ajoutée lors de la prochaine étape.</p>
+                <p v-if="isOwner && currentSearch.status === 'active'">
+                  Recherche un utilisateur ci-dessous pour l’inviter.
+                </p>
+                <p v-else-if="currentSearch.status !== 'active'">
+                  Réactive la recherche avant d’inviter une personne.
+                </p>
+                <p v-else>Seul le propriétaire peut envoyer une invitation.</p>
               </div>
             </div>
+          </div>
+
+          <div v-if="canInviteParticipant || invitationSuccess" class="invitation-area">
+            <div class="invitation-heading">
+              <span>Inviter un proche</span>
+              <p>Utilise l’adresse e-mail exacte de son compte.</p>
+            </div>
+
+            <form
+              v-if="canInviteParticipant"
+              class="invitation-form"
+              data-test="search-invitation-form"
+              @submit.prevent="searchProfileToInvite"
+            >
+              <label for="invitation-email">Adresse e-mail</label>
+              <div>
+                <input
+                  id="invitation-email"
+                  v-model="invitationEmail"
+                  data-test="search-invitation-email"
+                  type="email"
+                  placeholder="utilisateur@exemple.fr"
+                  autocomplete="off"
+                  :disabled="isSearchingProfile || isSendingInvitation"
+                  @input="updateInvitationEmail"
+                />
+                <button
+                  type="submit"
+                  class="lookup-button"
+                  :disabled="isSearchingProfile || isSendingInvitation"
+                >
+                  {{ isSearchingProfile ? 'Recherche…' : 'Rechercher' }}
+                </button>
+              </div>
+            </form>
+
+            <p v-if="invitationError" class="invitation-message error-message" role="alert">
+              {{ invitationError }}
+            </p>
+            <p
+              v-if="invitationSuccess"
+              class="invitation-message success-message"
+              role="status"
+            >
+              {{ invitationSuccess }}
+            </p>
+
+            <article
+              v-if="foundProfile && canInviteParticipant"
+              class="invitation-result"
+              data-test="search-invitation-profile"
+            >
+              <span class="avatar">
+                {{ (foundProfile.display_name || foundProfile.username).charAt(0).toUpperCase() }}
+              </span>
+              <div>
+                <small>Utilisateur trouvé</small>
+                <strong>{{ foundProfile.display_name || foundProfile.username }}</strong>
+                <p>{{ foundProfile.email }} · @{{ foundProfile.username }}</p>
+              </div>
+              <button
+                type="button"
+                class="send-invitation-button"
+                data-test="send-search-invitation"
+                :disabled="isSendingInvitation"
+                @click="sendInvitation"
+              >
+                {{ isSendingInvitation ? 'Envoi…' : 'Envoyer l’invitation' }}
+              </button>
+            </article>
           </div>
         </section>
 
@@ -958,6 +1172,126 @@ async function updateStatus(newStatus: SearchStatus) {
   background: #fffcf7;
 }
 
+.invitation-area {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #f0e5d8;
+}
+
+.invitation-heading > span,
+.invitation-form label,
+.invitation-result small {
+  color: #9a7042;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.invitation-heading p {
+  margin: 5px 0 0;
+  color: #846f5c;
+  font-size: 0.84rem;
+}
+
+.invitation-form {
+  display: grid;
+  gap: 7px;
+}
+
+.invitation-form > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 9px;
+}
+
+.invitation-form input {
+  min-width: 0;
+  padding: 12px 13px;
+  color: #4a3421;
+  border: 1px solid #e5d3bf;
+  border-radius: 11px;
+  outline: none;
+  background: #fff;
+}
+
+.invitation-form input:focus {
+  border-color: #f1a34a;
+  box-shadow: 0 0 0 3px rgba(241, 163, 74, 0.13);
+}
+
+.lookup-button,
+.send-invitation-button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 11px;
+  cursor: pointer;
+  font-weight: 850;
+}
+
+.lookup-button {
+  padding: 0 15px;
+  color: #75502c;
+  background: #fff0d8;
+}
+
+.lookup-button:disabled,
+.send-invitation-button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.invitation-message {
+  margin: 0;
+  padding: 11px 13px;
+  border-radius: 11px;
+  font-size: 0.84rem;
+  font-weight: 750;
+}
+
+.invitation-message.error-message {
+  color: #a13e30;
+  background: #fff0ed;
+}
+
+.invitation-message.success-message {
+  color: #287144;
+  background: #e7f7ec;
+}
+
+.invitation-result {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #f0ddc4;
+  border-radius: 15px;
+  background: #fffaf2;
+}
+
+.invitation-result strong {
+  display: block;
+  margin-top: 2px;
+  color: #4e3825;
+}
+
+.invitation-result p {
+  overflow: hidden;
+  margin: 3px 0 0;
+  color: #8a7461;
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+}
+
+.send-invitation-button {
+  grid-column: 1 / -1;
+  color: #fff;
+  background: linear-gradient(135deg, #ffa43a, #f28b24);
+}
+
 .participant-list article.pending {
   border-style: dashed;
   opacity: 0.78;
@@ -1181,6 +1515,10 @@ async function updateStatus(newStatus: SearchStatus) {
 
   .participant-list article {
     grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .invitation-form > div {
+    grid-template-columns: 1fr;
   }
 
   .participant-role {
