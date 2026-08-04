@@ -22,6 +22,16 @@ export type SearchStatus = 'active' | 'completed' | 'archived'
 export type SearchGender = 'female' | 'male' | 'mixed'
 export type ParticipantRole = 'owner' | 'member'
 export type InvitationStatus = 'pending' | 'accepted' | 'declined'
+export type NameDecisionChoice = 'liked' | 'rejected' | 'skipped'
+
+export interface FirstName {
+  id: number
+  name: string
+  gender: SearchGender
+  gender_label: string
+  origin: string
+  meaning: string
+}
 
 export interface NameSearchParticipant {
   id: number

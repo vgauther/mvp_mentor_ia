@@ -376,7 +376,7 @@ class NextFirstNameView(APIView):
                 gender__in=participant.search.genders,
             )
             .exclude(id__in=decided_first_name_ids)
-            .order_by("id")
+            .order_by("?")
             .first()
         )
 

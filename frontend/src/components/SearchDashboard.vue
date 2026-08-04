@@ -8,6 +8,10 @@ const props = defineProps<{
   userId: number
 }>()
 
+const emit = defineEmits<{
+  openSearch: [search: NameSearch]
+}>()
+
 const searches = ref<NameSearch[]>([])
 const isLoading = ref(true)
 const loadError = ref('')
@@ -37,9 +41,11 @@ const statusOptions: { value: SearchStatus | 'all'; label: string }[] = [
 const activeCount = computed(
   () => searches.value.filter((search) => search.status === 'active').length,
 )
+
 const completedCount = computed(
   () => searches.value.filter((search) => search.status === 'completed').length,
 )
+
 const archivedCount = computed(
   () => searches.value.filter((search) => search.status === 'archived').length,
 )
@@ -185,9 +191,9 @@ onMounted(() => {
         <span class="summary-icon">♥</span>
         <div>
           <strong>{{ activeCount }}</strong>
-          <span
-            >Recherche{{ activeCount > 1 ? 's' : '' }} active{{ activeCount > 1 ? 's' : '' }}</span
-          >
+          <span>
+            Recherche{{ activeCount > 1 ? 's' : '' }} active{{ activeCount > 1 ? 's' : '' }}
+          </span>
         </div>
       </article>
 
@@ -262,6 +268,7 @@ onMounted(() => {
 
       <div v-else-if="filteredSearches.length === 0" class="empty-state">
         <span class="empty-heart">♡</span>
+
         <h3>
           {{
             searches.length === 0
@@ -269,10 +276,13 @@ onMounted(() => {
               : 'Aucune recherche dans cette catégorie'
           }}
         </h3>
+
         <p v-if="searches.length === 0">
           Crée un espace pour découvrir des prénoms seul ou à deux et retrouver vos choix communs.
         </p>
+
         <p v-else>Choisis un autre filtre pour afficher le reste de tes recherches.</p>
+
         <button
           v-if="searches.length === 0"
           type="button"
@@ -304,7 +314,9 @@ onMounted(() => {
           <h3>{{ search.title }}</h3>
 
           <div class="gender-list" aria-label="Types de prénoms recherchés">
-            <span v-for="gender in search.genders" :key="gender">{{ genderLabel(gender) }}</span>
+            <span v-for="gender in search.genders" :key="gender">
+              {{ genderLabel(gender) }}
+            </span>
           </div>
 
           <div class="participant-row">
@@ -332,8 +344,13 @@ onMounted(() => {
 
           <footer>
             <span>Créée le {{ formatShortDate(search.created_at) }}</span>
-            <button type="button" disabled>
-              {{ search.status === 'active' ? 'Ouvrir bientôt' : 'Consulter bientôt' }}
+
+            <button
+              type="button"
+              data-test="open-search-button"
+              @click="emit('openSearch', search)"
+            >
+              {{ search.status === 'active' ? 'Ouvrir' : 'Consulter' }}
               <span>→</span>
             </button>
           </footer>
@@ -354,6 +371,7 @@ onMounted(() => {
 
         <form data-test="create-search-form" @submit.prevent="createSearch">
           <label for="search-title">Nom de la recherche</label>
+
           <input
             id="search-title"
             v-model="newTitle"
@@ -394,6 +412,7 @@ onMounted(() => {
             >
               Annuler
             </button>
+
             <button type="submit" class="confirm-button" :disabled="isCreating">
               {{ isCreating ? 'Création…' : 'Créer la recherche' }}
             </button>

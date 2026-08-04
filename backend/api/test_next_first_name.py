@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -184,6 +186,32 @@ class NextFirstNameViewTests(APITestCase):
                     response.data["id"],
                     expected_first_name.id,
                 )
+
+    def test_next_first_name_uses_random_database_order(self):
+        search, _ = self.create_search()
+
+        with CaptureQueriesContext(connection) as captured_queries:
+            response = self.client.get(
+                reverse(
+                    "next-first-name",
+                    kwargs={"search_id": search.id},
+                )
+            )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        executed_sql = " ".join(
+            query["sql"].upper()
+            for query in captured_queries.captured_queries
+        )
+
+        self.assertRegex(
+            executed_sql,
+            r"ORDER BY (?:RANDOM|RAND)\(\)",
+        )
 
     def test_next_first_name_excludes_decided_and_inactive_names(self):
         search, participant = self.create_search(
