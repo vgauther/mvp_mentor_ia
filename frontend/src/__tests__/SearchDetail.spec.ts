@@ -45,6 +45,28 @@ const activeSearch: NameSearch = {
   updated_at: '2026-08-04T08:00:00Z',
 }
 
+const acceptedMember = {
+  id: 92,
+  profile: {
+    id: 25,
+    username: 'partenaire',
+    display_name: 'Camille',
+  },
+  role: 'member' as const,
+  role_label: 'Participant',
+  invitation_status: 'accepted' as const,
+  invitation_status_label: 'Acceptée',
+  created_at: '2026-08-04T09:00:00Z',
+  updated_at: '2026-08-04T09:00:00Z',
+}
+
+const pendingMember = {
+  ...acceptedMember,
+  id: 93,
+  invitation_status: 'pending' as const,
+  invitation_status_label: 'En attente',
+}
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -56,6 +78,7 @@ function jsonResponse(body: unknown, status = 200) {
 
 afterEach(() => {
   vi.clearAllMocks()
+  vi.restoreAllMocks()
 })
 
 describe('SearchDetail', () => {
@@ -142,5 +165,126 @@ describe('SearchDetail', () => {
 
     expect(wrapper.find('[data-test="edit-search-button"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('Partagée avec moi')
+  })
+
+  it('permet au propriétaire de retirer un participant accepté', async () => {
+    const searchWithMember: NameSearch = {
+      ...activeSearch,
+      participants: [...activeSearch.participants, acceptedMember],
+    }
+    authenticatedFetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }))
+
+    const wrapper = mount(SearchDetail, {
+      props: {
+        search: searchWithMember,
+        userId: 12,
+      },
+    })
+
+    await wrapper.get('[data-test="remove-participant-92"]').trigger('click')
+    expect(wrapper.get('[data-test="participant-confirmation"]').text()).toContain(
+      'Retirer ce participant ?',
+    )
+    expect(wrapper.get('[data-test="participant-confirmation"]').text()).toContain(
+      'Camille n’aura plus accès à cette recherche et ses décisions seront supprimées.',
+    )
+
+    await wrapper.get('[data-test="confirm-participant-action"]').trigger('click')
+    await flushPromises()
+
+    expect(authenticatedFetchMock).toHaveBeenCalledWith('/api/searches/41/participants/92/', {
+      method: 'DELETE',
+    })
+    expect(wrapper.text()).toContain('Le participant a bien été retiré de la recherche.')
+    expect(wrapper.text()).not.toContain('Camille')
+    expect(wrapper.emitted('searchUpdated')?.[0]).toEqual([
+      {
+        ...searchWithMember,
+        participants: activeSearch.participants,
+      },
+    ])
+  })
+
+  it('permet au propriétaire d’annuler une invitation en attente', async () => {
+    const searchWithInvitation: NameSearch = {
+      ...activeSearch,
+      participants: [...activeSearch.participants, pendingMember],
+    }
+    authenticatedFetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }))
+
+    const wrapper = mount(SearchDetail, {
+      props: {
+        search: searchWithInvitation,
+        userId: 12,
+      },
+    })
+
+    await wrapper.get('[data-test="cancel-invitation-93"]').trigger('click')
+    expect(wrapper.get('[data-test="participant-confirmation"]').text()).toContain(
+      'Annuler cette invitation ?',
+    )
+
+    await wrapper.get('[data-test="confirm-participant-action"]').trigger('click')
+    await flushPromises()
+
+    expect(authenticatedFetchMock).toHaveBeenCalledWith('/api/searches/41/participants/93/', {
+      method: 'DELETE',
+    })
+    expect(wrapper.text()).toContain('L’invitation a bien été annulée.')
+    expect(wrapper.find('[data-test="search-invitation-form"]').exists()).toBe(true)
+  })
+
+  it('permet à un participant accepté de quitter la recherche', async () => {
+    const memberSearch: NameSearch = {
+      ...activeSearch,
+      creator: {
+        id: 12,
+        username: 'utilisateur',
+        display_name: 'Victor',
+      },
+      participants: [...activeSearch.participants, acceptedMember],
+    }
+    authenticatedFetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }))
+
+    const wrapper = mount(SearchDetail, {
+      props: {
+        search: memberSearch,
+        userId: 25,
+      },
+    })
+
+    await wrapper.get('[data-test="leave-search"]').trigger('click')
+    expect(wrapper.get('[data-test="participant-confirmation"]').text()).toContain(
+      'Quitter cette recherche ?',
+    )
+
+    await wrapper.get('[data-test="confirm-participant-action"]').trigger('click')
+    await flushPromises()
+
+    expect(authenticatedFetchMock).toHaveBeenCalledWith('/api/searches/41/participants/me/', {
+      method: 'DELETE',
+    })
+    expect(wrapper.emitted('back')).toHaveLength(1)
+  })
+
+  it('ne supprime rien lorsque la confirmation est refusée', async () => {
+    const searchWithMember: NameSearch = {
+      ...activeSearch,
+      participants: [...activeSearch.participants, acceptedMember],
+    }
+    const wrapper = mount(SearchDetail, {
+      props: {
+        search: searchWithMember,
+        userId: 12,
+      },
+    })
+
+    await wrapper.get('[data-test="remove-participant-92"]').trigger('click')
+    await wrapper.get('[data-test="cancel-participant-action"]').trigger('click')
+    await flushPromises()
+
+    expect(authenticatedFetchMock).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-test="participant-confirmation"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Camille')
   })
 })

@@ -48,6 +48,21 @@ const editGenders = ref<SearchGender[]>([])
 const isSavingSearch = ref(false)
 const editError = ref('')
 const editSuccess = ref('')
+const participantBeingRemovedId = ref<number | null>(null)
+const isLeavingSearch = ref(false)
+const participantActionError = ref('')
+const participantActionSuccess = ref('')
+
+type ParticipantConfirmation =
+  | {
+      kind: 'remove-participant' | 'cancel-invitation'
+      participant: NameSearchParticipant
+    }
+  | {
+      kind: 'leave-search'
+    }
+
+const participantConfirmation = ref<ParticipantConfirmation | null>(null)
 
 const genderLabels: Record<SearchGender, string> = {
   female: 'Féminin',
@@ -86,6 +101,60 @@ const canInviteParticipant = computed(
     pendingParticipants.value.length === 0,
 )
 
+const isConfirmingParticipantAction = computed(
+  () => participantBeingRemovedId.value !== null || isLeavingSearch.value,
+)
+
+const participantConfirmationTitle = computed(() => {
+  if (participantConfirmation.value?.kind === 'cancel-invitation') {
+    return 'Annuler cette invitation ?'
+  }
+
+  if (participantConfirmation.value?.kind === 'remove-participant') {
+    return 'Retirer ce participant ?'
+  }
+
+  return 'Quitter cette recherche ?'
+})
+
+const participantConfirmationMessage = computed(() => {
+  const confirmation = participantConfirmation.value
+
+  if (!confirmation) {
+    return ''
+  }
+
+  if (confirmation.kind === 'cancel-invitation') {
+    return `L’invitation envoyée à ${participantName(confirmation.participant)} sera annulée.`
+  }
+
+  if (confirmation.kind === 'remove-participant') {
+    return `${participantName(confirmation.participant)} n’aura plus accès à cette recherche et ses décisions seront supprimées.`
+  }
+
+  return 'Tu n’auras plus accès à cette recherche et toutes tes décisions seront supprimées.'
+})
+
+const participantConfirmationButtonLabel = computed(() => {
+  if (isConfirmingParticipantAction.value) {
+    return participantConfirmation.value?.kind === 'cancel-invitation'
+      ? 'Annulation…'
+      : participantConfirmation.value?.kind === 'remove-participant'
+        ? 'Retrait…'
+        : 'Départ…'
+  }
+
+  if (participantConfirmation.value?.kind === 'cancel-invitation') {
+    return 'Annuler l’invitation'
+  }
+
+  if (participantConfirmation.value?.kind === 'remove-participant') {
+    return 'Retirer le participant'
+  }
+
+  return 'Quitter la recherche'
+})
+
 const statusDescription = computed(() => {
   if (currentSearch.value.status === 'active') {
     return 'La recherche est ouverte : les participants peuvent encore parcourir et choisir des prénoms.'
@@ -114,6 +183,11 @@ watch(
       isViewingMatches.value = false
       matches.value = []
       matchesError.value = ''
+      participantBeingRemovedId.value = null
+      isLeavingSearch.value = false
+      participantActionError.value = ''
+      participantActionSuccess.value = ''
+      participantConfirmation.value = null
       resetInvitationForm()
     }
 
@@ -446,6 +520,128 @@ async function sendInvitation() {
     invitationError.value = 'Impossible de contacter Django pour envoyer cette invitation.'
   } finally {
     isSendingInvitation.value = false
+  }
+}
+
+function requestParticipantRemoval(participant: NameSearchParticipant) {
+  if (!isOwner.value || participant.role !== 'member') {
+    return
+  }
+
+  participantConfirmation.value = {
+    kind: participant.invitation_status === 'pending' ? 'cancel-invitation' : 'remove-participant',
+    participant,
+  }
+}
+
+function requestLeaveSearch() {
+  if (isOwner.value || !currentParticipant.value) {
+    return
+  }
+
+  participantConfirmation.value = { kind: 'leave-search' }
+}
+
+function closeParticipantConfirmation() {
+  if (isConfirmingParticipantAction.value) {
+    return
+  }
+
+  participantConfirmation.value = null
+}
+
+async function confirmParticipantAction() {
+  const confirmation = participantConfirmation.value
+
+  if (!confirmation || isConfirmingParticipantAction.value) {
+    return
+  }
+
+  if (confirmation.kind === 'leave-search') {
+    await leaveSearch()
+    return
+  }
+
+  await removeParticipant(confirmation.participant)
+}
+
+async function removeParticipant(participant: NameSearchParticipant) {
+  const isPendingInvitation = participant.invitation_status === 'pending'
+
+  participantBeingRemovedId.value = participant.id
+  participantActionError.value = ''
+  participantActionSuccess.value = ''
+
+  try {
+    const response = await authenticatedFetch(
+      `/api/searches/${currentSearch.value.id}/participants/${participant.id}/`,
+      { method: 'DELETE' },
+    )
+
+    if (!response.ok) {
+      participantActionError.value = await getErrorMessage(
+        response,
+        isPendingInvitation
+          ? 'Impossible d’annuler cette invitation.'
+          : 'Impossible de retirer ce participant.',
+      )
+      return
+    }
+
+    const updatedSearch: NameSearch = {
+      ...currentSearch.value,
+      participants: currentSearch.value.participants.filter(
+        (currentParticipant) => currentParticipant.id !== participant.id,
+      ),
+    }
+
+    currentSearch.value = updatedSearch
+    resetInvitationForm()
+    participantActionSuccess.value = isPendingInvitation
+      ? 'L’invitation a bien été annulée.'
+      : 'Le participant a bien été retiré de la recherche.'
+    emit('searchUpdated', updatedSearch)
+  } catch (error) {
+    console.error('Échec du retrait du participant :', error)
+    participantActionError.value = isPendingInvitation
+      ? 'Impossible de contacter Django pour annuler cette invitation.'
+      : 'Impossible de contacter Django pour retirer ce participant.'
+  } finally {
+    participantBeingRemovedId.value = null
+    participantConfirmation.value = null
+  }
+}
+
+async function leaveSearch() {
+  if (isOwner.value || !currentParticipant.value) {
+    return
+  }
+
+  isLeavingSearch.value = true
+  participantActionError.value = ''
+  participantActionSuccess.value = ''
+
+  try {
+    const response = await authenticatedFetch(
+      `/api/searches/${currentSearch.value.id}/participants/me/`,
+      { method: 'DELETE' },
+    )
+
+    if (!response.ok) {
+      participantActionError.value = await getErrorMessage(
+        response,
+        'Impossible de quitter cette recherche.',
+      )
+      return
+    }
+
+    emit('back')
+  } catch (error) {
+    console.error('Échec du départ de la recherche :', error)
+    participantActionError.value = 'Impossible de contacter Django pour quitter cette recherche.'
+  } finally {
+    isLeavingSearch.value = false
+    participantConfirmation.value = null
   }
 }
 
@@ -829,7 +1025,19 @@ async function updateStatus(newStatus: SearchStatus) {
                 <strong>{{ participantName(participant) }}</strong>
                 <span>@{{ participant.profile.username }}</span>
               </div>
-              <span class="participant-role">{{ participant.role_label }}</span>
+              <div class="participant-actions">
+                <span class="participant-role">{{ participant.role_label }}</span>
+                <button
+                  v-if="isOwner && participant.role === 'member'"
+                  type="button"
+                  class="participant-remove-button"
+                  :data-test="`remove-participant-${participant.id}`"
+                  :disabled="participantBeingRemovedId !== null"
+                  @click="requestParticipantRemoval(participant)"
+                >
+                  {{ participantBeingRemovedId === participant.id ? 'Retrait…' : 'Retirer' }}
+                </button>
+              </div>
             </article>
 
             <article
@@ -842,7 +1050,23 @@ async function updateStatus(newStatus: SearchStatus) {
                 <strong>{{ participantName(participant) }}</strong>
                 <span>Invitation en attente</span>
               </div>
-              <span class="participant-role">En attente</span>
+              <div class="participant-actions">
+                <span class="participant-role">En attente</span>
+                <button
+                  v-if="isOwner"
+                  type="button"
+                  class="participant-remove-button"
+                  :data-test="`cancel-invitation-${participant.id}`"
+                  :disabled="participantBeingRemovedId !== null"
+                  @click="requestParticipantRemoval(participant)"
+                >
+                  {{
+                    participantBeingRemovedId === participant.id
+                      ? 'Annulation…'
+                      : 'Annuler l’invitation'
+                  }}
+                </button>
+              </div>
             </article>
 
             <div
@@ -862,6 +1086,17 @@ async function updateStatus(newStatus: SearchStatus) {
               </div>
             </div>
           </div>
+
+          <p v-if="participantActionError" class="participant-message error-message" role="alert">
+            {{ participantActionError }}
+          </p>
+          <p
+            v-if="participantActionSuccess"
+            class="participant-message success-message"
+            role="status"
+          >
+            {{ participantActionSuccess }}
+          </p>
 
           <div v-if="canInviteParticipant || invitationSuccess" class="invitation-area">
             <div class="invitation-heading">
@@ -996,6 +1231,19 @@ async function updateStatus(newStatus: SearchStatus) {
             <span>i</span>
             <p>Seul le propriétaire peut terminer, réactiver ou archiver cette recherche.</p>
           </div>
+
+          <div v-if="!isOwner && currentParticipant" class="leave-search-area">
+            <button
+              type="button"
+              class="leave-search-button"
+              data-test="leave-search"
+              :disabled="isLeavingSearch"
+              @click="requestLeaveSearch"
+            >
+              {{ isLeavingSearch ? 'Départ…' : 'Quitter la recherche' }}
+            </button>
+            <small>Tes décisions dans cette recherche seront supprimées.</small>
+          </div>
         </section>
       </div>
 
@@ -1046,6 +1294,58 @@ async function updateStatus(newStatus: SearchStatus) {
         </div>
       </section>
     </template>
+
+    <div
+      v-if="participantConfirmation"
+      class="confirmation-overlay"
+      data-test="participant-confirmation"
+      @click.self="closeParticipantConfirmation"
+    >
+      <section
+        class="confirmation-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="participant-confirmation-title"
+        aria-describedby="participant-confirmation-message"
+      >
+        <button
+          type="button"
+          class="confirmation-close"
+          aria-label="Fermer la confirmation"
+          :disabled="isConfirmingParticipantAction"
+          data-test="close-participant-confirmation"
+          @click="closeParticipantConfirmation"
+        >
+          ×
+        </button>
+
+        <span class="confirmation-icon" aria-hidden="true">!</span>
+        <span class="section-kicker">Confirmation</span>
+        <h3 id="participant-confirmation-title">{{ participantConfirmationTitle }}</h3>
+        <p id="participant-confirmation-message">{{ participantConfirmationMessage }}</p>
+
+        <div class="confirmation-actions">
+          <button
+            type="button"
+            class="confirmation-cancel"
+            :disabled="isConfirmingParticipantAction"
+            data-test="cancel-participant-action"
+            @click="closeParticipantConfirmation"
+          >
+            Non, conserver
+          </button>
+          <button
+            type="button"
+            class="confirmation-submit"
+            :disabled="isConfirmingParticipantAction"
+            data-test="confirm-participant-action"
+            @click="confirmParticipantAction"
+          >
+            {{ participantConfirmationButtonLabel }}
+          </button>
+        </div>
+      </section>
+    </div>
   </div>
 </template>
 
@@ -1758,6 +2058,52 @@ async function updateStatus(newStatus: SearchStatus) {
   background: #fff0d8;
 }
 
+.participant-actions {
+  display: grid;
+  justify-items: end;
+  gap: 7px;
+}
+
+.participant-remove-button,
+.leave-search-button {
+  border: 1px solid #e8b9b2;
+  border-radius: 10px;
+  color: #9d4034;
+  background: #fff4f1;
+  cursor: pointer;
+  font-weight: 850;
+}
+
+.participant-remove-button {
+  min-height: 33px;
+  padding: 0 10px;
+  font-size: 0.75rem;
+}
+
+.participant-remove-button:disabled,
+.leave-search-button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.participant-message {
+  margin: 12px 0 0;
+  padding: 11px 13px;
+  border-radius: 11px;
+  font-size: 0.84rem;
+  font-weight: 750;
+}
+
+.participant-message.error-message {
+  color: #a13e30;
+  background: #fff0ed;
+}
+
+.participant-message.success-message {
+  color: #287144;
+  background: #e7f7ec;
+}
+
 .empty-slot {
   grid-template-columns: auto minmax(0, 1fr);
   border-style: dashed;
@@ -1830,6 +2176,127 @@ async function updateStatus(newStatus: SearchStatus) {
 .member-note p {
   margin: 2px 0 0;
   line-height: 1.5;
+}
+
+.leave-search-area {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #f0e5d8;
+}
+
+.leave-search-button {
+  min-height: 43px;
+  padding: 0 15px;
+}
+
+.leave-search-area small {
+  color: #917c69;
+  line-height: 1.45;
+}
+
+.confirmation-overlay {
+  position: fixed;
+  z-index: 1000;
+  display: grid;
+  padding: 24px;
+  background: rgba(63, 45, 29, 0.48);
+  inset: 0;
+  place-items: center;
+  backdrop-filter: blur(3px);
+}
+
+.confirmation-dialog {
+  position: relative;
+  display: grid;
+  width: min(100%, 460px);
+  justify-items: center;
+  padding: 34px;
+  border: 1px solid rgba(126, 83, 35, 0.12);
+  border-radius: 24px;
+  background: #fffdf9;
+  box-shadow: 0 24px 70px rgba(57, 38, 21, 0.26);
+  text-align: center;
+}
+
+.confirmation-close {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: #806c59;
+  background: #f7efe5;
+  cursor: pointer;
+  font-size: 1.35rem;
+  line-height: 1;
+  place-items: center;
+}
+
+.confirmation-icon {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  margin-bottom: 17px;
+  border-radius: 18px;
+  color: #a54135;
+  background: #fff0ed;
+  font-size: 1.55rem;
+  font-weight: 900;
+  place-items: center;
+}
+
+.confirmation-dialog h3 {
+  margin: 7px 0 10px;
+  color: #4a3421;
+  font-size: 1.42rem;
+}
+
+.confirmation-dialog > p {
+  max-width: 370px;
+  margin: 0;
+  color: #7d6957;
+  line-height: 1.6;
+}
+
+.confirmation-actions {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 1fr 1fr;
+  gap: 11px;
+  margin-top: 27px;
+}
+
+.confirmation-actions button {
+  min-height: 45px;
+  padding: 0 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 850;
+}
+
+.confirmation-actions button:disabled,
+.confirmation-close:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.confirmation-cancel {
+  border: 1px solid #e1cdb9;
+  color: #6f5742;
+  background: #fffaf3;
+}
+
+.confirmation-submit {
+  border: 1px solid #e6a69e;
+  color: #fff;
+  background: linear-gradient(135deg, #c95c4e, #a94034);
+  box-shadow: 0 10px 22px rgba(169, 64, 52, 0.18);
 }
 
 .features-section {
@@ -1964,6 +2431,11 @@ async function updateStatus(newStatus: SearchStatus) {
     grid-column: 2;
     width: fit-content;
   }
+
+  .participant-actions {
+    grid-column: 2;
+    justify-items: start;
+  }
 }
 
 @media (max-width: 520px) {
@@ -1974,6 +2446,18 @@ async function updateStatus(newStatus: SearchStatus) {
 
   .refresh-button {
     width: 100%;
+  }
+
+  .confirmation-overlay {
+    padding: 16px;
+  }
+
+  .confirmation-dialog {
+    padding: 30px 22px 22px;
+  }
+
+  .confirmation-actions {
+    grid-template-columns: 1fr;
   }
 }
 </style>
