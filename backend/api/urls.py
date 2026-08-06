@@ -1,6 +1,10 @@
 from django.urls import path
 
 from .liked_first_names import SearchLikedFirstNameListView
+from .participant_removal import (
+    SearchParticipantLeaveView,
+    SearchParticipantRemovalView,
+)
 from .search_lifecycle import (
     LifecycleNameDecisionListCreateView,
     LifecycleNextFirstNameView,
@@ -54,6 +58,16 @@ urlpatterns = [
         "searches/<int:search_id>/invitations/",
         SearchInvitationCreateView.as_view(),
         name="search-invitation-create",
+    ),
+    path(
+        "searches/<int:search_id>/participants/me/",
+        SearchParticipantLeaveView.as_view(),
+        name="search-participant-leave",
+    ),
+    path(
+        "searches/<int:search_id>/participants/<int:participant_id>/",
+        SearchParticipantRemovalView.as_view(),
+        name="search-participant-removal",
     ),
     path(
         "invitations/",
