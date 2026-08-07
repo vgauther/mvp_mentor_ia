@@ -16,14 +16,14 @@ class BusinessSerializerTests(TestCase):
         self.active_first_name = FirstName.objects.create(
             name="Emma",
             gender=self.gender,
-            origin="Germanique",
+            origin="germanique",
             meaning="Universelle",
             is_active=True,
         )
         self.inactive_first_name = FirstName.objects.create(
             name="Alba",
             gender=self.gender,
-            origin="Latine",
+            origin="latine",
             meaning="Aube",
             is_active=False,
         )
@@ -39,11 +39,20 @@ class BusinessSerializerTests(TestCase):
                 "gender",
                 "gender_label",
                 "origin",
+                "origin_label",
+                "origin_description",
                 "meaning",
             },
         )
         self.assertEqual(serializer.data["name"], "Emma")
         self.assertEqual(serializer.data["gender"], self.gender)
+        self.assertEqual(serializer.data["origin"], "germanique")
+        self.assertEqual(serializer.data["origin_label"], "Germanique")
+        self.assertNotEqual(
+            serializer.data["origin_description"],
+            "",
+        )
+        self.assertEqual(serializer.data["meaning"], "Universelle")
         self.assertNotIn("is_active", serializer.data)
 
     def test_name_search_protects_managed_fields(self):

@@ -2,6 +2,7 @@ from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.exceptions import NotFound
+from .first_name_origins import FIRST_NAME_ORIGINS
 from rest_framework.generics import (
     ListAPIView,
     ListCreateAPIView,
@@ -32,6 +33,7 @@ from .serializers import (
     SearchInvitationCreateSerializer,
     SearchInvitationResponseSerializer,
     SearchInvitationSerializer,
+    FirstNameOriginSerializer,
 )
 
 
@@ -114,6 +116,23 @@ class FirstNameListView(ListAPIView):
     def get_queryset(self):
         return FirstName.objects.filter(is_active=True)
 
+class FirstNameOriginListView(APIView):
+    def get(self, request):
+        origins = [
+            {
+                "id": origin_id,
+                "label": label,
+                "description": description,
+            }
+            for origin_id, label, description in FIRST_NAME_ORIGINS
+        ]
+
+        serializer = FirstNameOriginSerializer(
+            origins,
+            many=True,
+        )
+
+        return Response(serializer.data)
 
 class NameSearchListCreateView(ListCreateAPIView):
     serializer_class = NameSearchSerializer

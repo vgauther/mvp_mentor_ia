@@ -1,6 +1,6 @@
 from django.db import models
 from django.db.models.functions import Lower
-
+from .first_name_origins import FIRST_NAME_ORIGIN_CHOICES
 
 class Profile(models.Model):
     keycloak_id = models.CharField(
@@ -39,7 +39,9 @@ class FirstName(models.Model):
     )
     origin = models.CharField(
         max_length=150,
+        choices=FIRST_NAME_ORIGIN_CHOICES,
         blank=True,
+        db_index=True,
     )
     meaning = models.TextField(blank=True)
     is_active = models.BooleanField(

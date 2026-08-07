@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from .first_name_origins import get_origin_description
+
 from .models import (
     FirstName,
     NameDecision,
@@ -149,6 +151,14 @@ class FirstNameSerializer(serializers.ModelSerializer):
         source="get_gender_display",
         read_only=True,
     )
+    origin_label = serializers.CharField(
+        source="get_origin_display",
+        read_only=True,
+    )
+    origin_description = serializers.SerializerMethodField()
+
+    def get_origin_description(self, first_name):
+        return get_origin_description(first_name.origin)
 
     class Meta:
         model = FirstName
@@ -158,10 +168,16 @@ class FirstNameSerializer(serializers.ModelSerializer):
             "gender",
             "gender_label",
             "origin",
+            "origin_label",
+            "origin_description",
             "meaning",
         )
         read_only_fields = fields
 
+class FirstNameOriginSerializer(serializers.Serializer):
+    id = serializers.CharField(read_only=True)
+    label = serializers.CharField(read_only=True)
+    description = serializers.CharField(read_only=True)
 
 class NameSearchParticipantSerializer(serializers.ModelSerializer):
     profile = ProfileSummarySerializer(read_only=True)

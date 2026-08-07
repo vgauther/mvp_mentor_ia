@@ -22,6 +22,7 @@ from .views import (
     SearchInvitationCreateView,
     SearchInvitationListView,
     SearchMatchListView,
+    FirstNameOriginListView,
 )
 
 
@@ -93,6 +94,11 @@ urlpatterns = [
         "searches/<int:search_id>/liked-first-names/",
         SearchLikedFirstNameListView.as_view(),
         name="search-liked-first-name-list",
+    ),
+    path(
+    "first-name-origins/",
+    FirstNameOriginListView.as_view(),
+    name="first-name-origin-list",
     ),
     path(
         "searches/<int:search_id>/matches/",

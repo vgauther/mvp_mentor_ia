@@ -1,0 +1,172 @@
+FIRST_NAME_ORIGINS = (
+    (
+        "indeterminee",
+        "Indéterminée",
+        "Origine insuffisamment documentée ou non attribuable de façon fiable.",
+    ),
+    (
+        "internationale",
+        "Internationale",
+        "Prénom présent dans plusieurs cultures sans origine principale exploitable.",
+    ),
+    (
+        "arabe",
+        "Arabe",
+        "Origine arabe, islamique ou maghrébine principalement arabophone.",
+    ),
+    (
+        "hebraique",
+        "Hébraïque",
+        "Origine hébraïque, juive ou biblique hébraïque.",
+    ),
+    (
+        "semitique_autre",
+        "Sémitique autre",
+        "Origine araméenne, assyrienne, akkadienne, phénicienne ou autre "
+        "branche sémitique.",
+    ),
+    (
+        "latine",
+        "Latine",
+        "Origine latine ou romaine ancienne, hors famille moderne plus précise.",
+    ),
+    (
+        "grecque",
+        "Grecque",
+        "Origine grecque ancienne ou moderne, y compris les références "
+        "mythologiques grecques.",
+    ),
+    (
+        "germanique",
+        "Germanique",
+        "Origine germanique continentale : allemande, néerlandaise, franque, "
+        "gothique ou vieux-saxonne.",
+    ),
+    (
+        "anglo_saxonne",
+        "Anglo-saxonne",
+        "Origine anglaise, anglo-saxonne ou anglophone principalement "
+        "rattachée à cette famille.",
+    ),
+    (
+        "francaise",
+        "Française",
+        "Origine française, occitane, provençale ou normande française.",
+    ),
+    (
+        "hispanique",
+        "Hispanique",
+        "Origine espagnole, catalane ou hispanophone.",
+    ),
+    (
+        "italienne",
+        "Italienne",
+        "Origine italienne, sicilienne ou régionale italienne.",
+    ),
+    (
+        "lusophone",
+        "Lusophone",
+        "Origine portugaise, brésilienne ou lusophone.",
+    ),
+    (
+        "celtique",
+        "Celtique",
+        "Origine irlandaise, galloise, bretonne, écossaise gaélique, "
+        "cornique ou mannoise.",
+    ),
+    (
+        "nordique_balte",
+        "Nordique ou balte",
+        "Origine scandinave, norroise, finnoise, estonienne, lettone ou "
+        "lituanienne.",
+    ),
+    (
+        "slave",
+        "Slave",
+        "Origine russe, ukrainienne, polonaise, tchèque, slovaque, "
+        "balkanique slave ou autre famille slave.",
+    ),
+    ("basque", "Basque", "Origine basque."),
+    (
+        "balkanique",
+        "Balkanique",
+        "Origine albanaise, roumaine, hongroise ou autre origine balkanique "
+        "non slave.",
+    ),
+    (
+        "turcique",
+        "Turcique",
+        "Origine turque, azérie, tatare, kazakhe, ouzbèke ou autre famille "
+        "turcique.",
+    ),
+    (
+        "persane_iranienne",
+        "Persane ou iranienne",
+        "Origine persane, iranienne, kurde, pachtoune, tadjike ou avestique.",
+    ),
+    (
+        "caucasienne",
+        "Caucasienne",
+        "Origine arménienne, géorgienne ou autre famille du Caucase.",
+    ),
+    (
+        "indienne_sanskrite",
+        "Indienne ou sanskrite",
+        "Origine sanskrite ou rattachée aux principales langues de l’Inde.",
+    ),
+    (
+        "sud_asiatique_autre",
+        "Sud-asiatique autre",
+        "Origine bengalie, ourdoue, népalaise, cinghalaise ou sud-asiatique "
+        "non classée ailleurs.",
+    ),
+    (
+        "chinoise",
+        "Chinoise",
+        "Origine chinoise, mandarine ou cantonaise.",
+    ),
+    ("japonaise", "Japonaise", "Origine japonaise."),
+    ("coreenne", "Coréenne", "Origine coréenne."),
+    (
+        "asiatique_sud_est",
+        "Asiatique du Sud-Est",
+        "Origine vietnamienne, thaïe, khmère, laotienne ou birmane.",
+    ),
+    (
+        "africaine",
+        "Africaine",
+        "Origine d’Afrique subsaharienne, nord-africaine non arabe ou "
+        "africaine non classée ailleurs.",
+    ),
+    (
+        "austronesienne_oceanienne",
+        "Austronésienne ou océanienne",
+        "Origine indonésienne, malaise, philippine, polynésienne, hawaïenne, "
+        "maorie ou océanienne.",
+    ),
+    (
+        "autochtone_ameriques",
+        "Autochtone des Amériques",
+        "Origine amérindienne, inuite, nahuatl, maya, quechua ou autre peuple "
+        "autochtone des Amériques.",
+    ),
+)
+
+FIRST_NAME_ORIGIN_CHOICES = tuple(
+    (origin_id, label)
+    for origin_id, label, _description in FIRST_NAME_ORIGINS
+)
+
+FIRST_NAME_ORIGIN_IDS = frozenset(
+    origin_id
+    for origin_id, _label, _description in FIRST_NAME_ORIGINS
+)
+
+FIRST_NAME_ORIGIN_DESCRIPTIONS = {
+    origin_id: description
+    for origin_id, _label, description in FIRST_NAME_ORIGINS
+}
+
+
+def get_origin_description(origin_id: str) -> str:
+    return FIRST_NAME_ORIGIN_DESCRIPTIONS.get(origin_id, "")

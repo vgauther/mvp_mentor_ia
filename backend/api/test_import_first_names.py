@@ -21,10 +21,10 @@ class ImportFirstNamesCommandTests(TestCase):
 
     def test_imports_first_names_and_converts_genders(self):
         csv_path = self.create_csv(
-            "prenom,sexe\n"
-            "Alice,féminin\n"
-            "Paul,masculin\n"
-            "Camille,neutre\n"
+            "prenom,sexe,origine,signification\n"
+            "Alice,féminin,germanique,Noble\n"
+            "Paul,masculin,latine,Petit\n"
+            "Camille,neutre,francaise,Assistant de cérémonie\n"
         )
         output = StringIO()
 
@@ -48,6 +48,14 @@ class ImportFirstNamesCommandTests(TestCase):
             FirstName.objects.get(name="Camille").gender,
             FirstName.Gender.MIXED,
         )
+        self.assertEqual(
+            FirstName.objects.get(name="Alice").origin,
+            "germanique",
+        )
+        self.assertEqual(
+            FirstName.objects.get(name="Alice").meaning,
+            "Noble",
+        )
 
         self.assertIn(
             "3 prénom(s) créé(s)",
@@ -56,9 +64,9 @@ class ImportFirstNamesCommandTests(TestCase):
 
     def test_import_can_be_run_twice_without_creating_duplicates(self):
         csv_path = self.create_csv(
-            "prenom,sexe\n"
-            "Alice,féminin\n"
-            "Paul,masculin\n"
+            "prenom,sexe,origine,signification\n"
+            "Alice,féminin,germanique,Noble\n"
+            "Paul,masculin,latine,Petit\n"
         )
 
         call_command(
@@ -81,19 +89,25 @@ class ImportFirstNamesCommandTests(TestCase):
             second_output.getvalue(),
         )
         self.assertIn(
-            "2 ligne(s) ignorée(s)",
+            "0 prénom(s) mis à jour",
+            second_output.getvalue(),
+        )
+        self.assertIn(
+            "2 prénom(s) inchangé(s)",
             second_output.getvalue(),
         )
 
-    def test_existing_name_is_detected_case_insensitively(self):
-        FirstName.objects.create(
+    def test_existing_name_is_updated_case_insensitively(self):
+        existing_first_name = FirstName.objects.create(
             name="Alice",
-            gender=FirstName.Gender.FEMALE,
+            gender=FirstName.Gender.MIXED,
+            origin="indeterminee",
+            meaning="Ancienne information",
         )
 
         csv_path = self.create_csv(
-            "prenom,sexe\n"
-            "alice,féminin\n"
+            "prenom,sexe,origine,signification\n"
+            "alice,féminin,germanique,Noble\n"
         )
         output = StringIO()
 
@@ -104,20 +118,40 @@ class ImportFirstNamesCommandTests(TestCase):
         )
 
         self.assertEqual(FirstName.objects.count(), 1)
+
+        imported_first_name = FirstName.objects.get()
+
         self.assertEqual(
-            FirstName.objects.get().name,
-            "Alice",
+            imported_first_name.id,
+            existing_first_name.id,
+        )
+        self.assertEqual(imported_first_name.name, "alice")
+        self.assertEqual(
+            imported_first_name.gender,
+            FirstName.Gender.FEMALE,
+        )
+        self.assertEqual(
+            imported_first_name.origin,
+            "germanique",
+        )
+        self.assertEqual(
+            imported_first_name.meaning,
+            "Noble",
         )
         self.assertIn(
             "0 prénom(s) créé(s)",
             output.getvalue(),
         )
+        self.assertIn(
+            "1 prénom(s) mis à jour",
+            output.getvalue(),
+        )
 
     def test_rejects_unknown_gender_without_importing_anything(self):
         csv_path = self.create_csv(
-            "prenom,sexe\n"
-            "Alice,féminin\n"
-            "Alexandre,inconnu\n"
+            "prenom,sexe,origine,signification\n"
+            "Alice,féminin,germanique,Noble\n"
+            "Alexandre,inconnu,grecque,Protecteur\n"
         )
 
         with self.assertRaisesMessage(
@@ -139,7 +173,44 @@ class ImportFirstNamesCommandTests(TestCase):
 
         with self.assertRaisesMessage(
             CommandError,
-            "Colonne(s) obligatoire(s) absente(s) : sexe",
+            (
+                "Colonne(s) obligatoire(s) absente(s) : "
+                "origine, sexe, signification"
+            ),
+        ):
+            call_command(
+                "import_first_names",
+                str(csv_path),
+            )
+
+        self.assertEqual(FirstName.objects.count(), 0)
+
+    def test_rejects_unknown_origin_without_importing_anything(self):
+        csv_path = self.create_csv(
+            "prenom,sexe,origine,signification\n"
+            "Alice,féminin,origine_inconnue,Noble\n"
+        )
+
+        with self.assertRaisesMessage(
+            CommandError,
+            "origine inconnue",
+        ):
+            call_command(
+                "import_first_names",
+                str(csv_path),
+            )
+
+        self.assertEqual(FirstName.objects.count(), 0)
+
+    def test_rejects_empty_meaning_without_importing_anything(self):
+        csv_path = self.create_csv(
+            "prenom,sexe,origine,signification\n"
+            "Alice,féminin,germanique,\n"
+        )
+
+        with self.assertRaisesMessage(
+            CommandError,
+            "signification vide",
         ):
             call_command(
                 "import_first_names",
