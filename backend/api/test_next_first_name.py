@@ -353,6 +353,84 @@ class NextFirstNameViewTests(APITestCase):
         self.assertEqual(response.data["id"], arabic_first_name.id)
         self.assertNotEqual(response.data["id"], french_first_name.id)
 
+    def test_origin_balance_restarts_after_filters_are_updated(self):
+        french_first_name = FirstName.objects.create(
+            name="Fleur",
+            gender=FirstName.Gender.FEMALE,
+            origin="francaise",
+        )
+        italian_first_name = FirstName.objects.create(
+            name="Giulia",
+            gender=FirstName.Gender.FEMALE,
+            origin="italienne",
+        )
+        hispanic_first_name = FirstName.objects.create(
+            name="Ines",
+            gender=FirstName.Gender.FEMALE,
+            origin="hispanique",
+        )
+        lusophone_first_name = FirstName.objects.create(
+            name="Beatriz",
+            gender=FirstName.Gender.FEMALE,
+            origin="lusophone",
+        )
+        search, participant = self.create_search(
+            genders=[FirstName.Gender.FEMALE],
+            origins=["francaise", "italienne", "hispanique"],
+        )
+
+        for index in range(3):
+            decided_french_name = FirstName.objects.create(
+                name=f"AncienFrancais{index}",
+                gender=FirstName.Gender.FEMALE,
+                origin="francaise",
+            )
+            NameDecision.objects.create(
+                participant=participant,
+                first_name=decided_french_name,
+                choice=NameDecision.Choice.REJECTED,
+            )
+
+        response = self.client.patch(
+            reverse(
+                "name-search-update",
+                kwargs={"search_id": search.id},
+            ),
+            {
+                "origins": [
+                    "francaise",
+                    "italienne",
+                    "hispanique",
+                    "lusophone",
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        for expected_first_name in (
+            french_first_name,
+            italian_first_name,
+            hispanic_first_name,
+            lusophone_first_name,
+        ):
+            response = self.client.get(
+                reverse(
+                    "next-first-name",
+                    kwargs={"search_id": search.id},
+                )
+            )
+
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertEqual(response.data["id"], expected_first_name.id)
+
+            NameDecision.objects.create(
+                participant=participant,
+                first_name=expected_first_name,
+                choice=NameDecision.Choice.REJECTED,
+            )
+
     def test_origin_balance_falls_back_when_an_origin_is_exhausted(self):
         french_first_name = FirstName.objects.create(
             name="Fleur",

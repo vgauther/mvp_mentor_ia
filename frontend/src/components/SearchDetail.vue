@@ -221,6 +221,11 @@ function closeNameBrowser() {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
+function handleBrowserSearchUpdated(updatedSearch: NameSearch) {
+  currentSearch.value = updatedSearch
+  emit('searchUpdated', updatedSearch)
+}
+
 async function loadLikedFirstNames() {
   isLoadingLikedFirstNames.value = true
   likedFirstNamesError.value = ''
@@ -773,9 +778,10 @@ onMounted(() => {
   <div class="detail-content">
     <NameBrowser
       v-if="isBrowsingFirstNames"
-      :search-id="currentSearch.id"
-      :search-title="currentSearch.title"
+      :search="currentSearch"
+      :can-edit-filters="isOwner"
       @back="closeNameBrowser"
+      @search-updated="handleBrowserSearchUpdated"
     />
 
     <section v-else-if="isViewingLikedFirstNames" class="matches-view">

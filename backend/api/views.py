@@ -417,6 +417,7 @@ class NextFirstNameView(APIView):
             NameDecision.objects.filter(
                 participant=participant,
                 first_name__origin__in=candidate_origins,
+                created_at__gte=participant.search.updated_at,
             )
             .values("first_name__origin")
             .annotate(total=Count("id"))

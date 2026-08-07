@@ -2,7 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import NameBrowser from '../components/NameBrowser.vue'
-import type { FirstName } from '../types/api'
+import type { FirstName, NameSearch } from '../types/api'
 
 const { authenticatedFetchMock, getErrorMessageMock } = vi.hoisted(() => ({
   authenticatedFetchMock: vi.fn<(path: string, options?: RequestInit) => Promise<Response>>(),
@@ -25,6 +25,26 @@ const firstName: FirstName = {
   meaning: 'Richesse',
 }
 
+const activeSearch: NameSearch = {
+  id: 41,
+  title: 'Notre futur prénom',
+  genders: ['female', 'male', 'mixed'],
+  origins: [],
+  min_length: null,
+  max_length: null,
+  first_letters: [],
+  status: 'active',
+  status_label: 'Active',
+  creator: {
+    id: 12,
+    username: 'utilisateur',
+    display_name: 'Victor',
+  },
+  participants: [],
+  created_at: '2026-08-04T08:00:00Z',
+  updated_at: '2026-08-04T08:00:00Z',
+}
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -45,8 +65,8 @@ describe('NameBrowser', () => {
 
     const wrapper = mount(NameBrowser, {
       props: {
-        searchId: 41,
-        searchTitle: 'Notre futur prénom',
+        search: activeSearch,
+        canEditFilters: true,
       },
     })
 
@@ -66,8 +86,8 @@ describe('NameBrowser', () => {
 
     const wrapper = mount(NameBrowser, {
       props: {
-        searchId: 41,
-        searchTitle: 'Notre futur prénom',
+        search: activeSearch,
+        canEditFilters: true,
       },
     })
 
@@ -83,5 +103,78 @@ describe('NameBrowser', () => {
       }),
     })
     expect(authenticatedFetchMock).toHaveBeenNthCalledWith(3, '/api/searches/41/next-first-name/')
+  })
+
+  it('modifie les filtres depuis le parcours puis recharge une proposition', async () => {
+    const origins = [
+      {
+        id: 'latine',
+        label: 'Latine',
+        description: 'Origine latine.',
+      },
+    ]
+    const updatedSearch: NameSearch = {
+      ...activeSearch,
+      genders: ['female'],
+      origins: ['latine'],
+      min_length: 4,
+      max_length: 8,
+      first_letters: ['A'],
+    }
+
+    authenticatedFetchMock
+      .mockResolvedValueOnce(jsonResponse(firstName))
+      .mockResolvedValueOnce(jsonResponse(origins))
+      .mockResolvedValueOnce(jsonResponse(updatedSearch))
+      .mockResolvedValueOnce(jsonResponse({ ...firstName, id: 18, name: 'Alice' }))
+
+    const wrapper = mount(NameBrowser, {
+      props: {
+        search: activeSearch,
+        canEditFilters: true,
+      },
+    })
+
+    await flushPromises()
+    await wrapper.get('[data-test="open-quick-filters"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-test="quick-filter-gender-male"]').trigger('change')
+    await wrapper.get('[data-test="quick-filter-gender-mixed"]').trigger('change')
+    await wrapper.get('[data-test="quick-filter-origin-latine"]').trigger('change')
+    await wrapper.get('[data-test="quick-filter-min-length"]').setValue('4')
+    await wrapper.get('[data-test="quick-filter-max-length"]').setValue('8')
+    await wrapper.get('[data-test="quick-filter-first-letter-A"]').trigger('change')
+    await wrapper.get('[data-test="save-quick-filters"]').trigger('submit')
+    await flushPromises()
+
+    expect(authenticatedFetchMock).toHaveBeenNthCalledWith(3, '/api/searches/41/', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        genders: ['female'],
+        origins: ['latine'],
+        min_length: 4,
+        max_length: 8,
+        first_letters: ['A'],
+      }),
+    })
+    expect(authenticatedFetchMock).toHaveBeenNthCalledWith(4, '/api/searches/41/next-first-name/')
+    expect(wrapper.find('[data-test="quick-filters-panel"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Alice')
+    expect(wrapper.emitted('searchUpdated')?.[0]).toEqual([updatedSearch])
+  })
+
+  it('masque la modification des filtres pour un participant', async () => {
+    authenticatedFetchMock.mockResolvedValueOnce(jsonResponse(firstName))
+
+    const wrapper = mount(NameBrowser, {
+      props: {
+        search: activeSearch,
+        canEditFilters: false,
+      },
+    })
+
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="open-quick-filters"]').exists()).toBe(false)
   })
 })

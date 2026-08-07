@@ -2,15 +2,17 @@
 import { computed, onMounted, ref } from 'vue'
 
 import { authenticatedFetch, getErrorMessage } from '../api/client'
-import type { FirstName, NameDecisionChoice } from '../types/api'
+import type { FirstName, NameDecisionChoice, NameSearch } from '../types/api'
+import SearchFiltersPanel from './SearchFiltersPanel.vue'
 
 const props = defineProps<{
-  searchId: number
-  searchTitle: string
+  search: NameSearch
+  canEditFilters: boolean
 }>()
 
 const emit = defineEmits<{
   back: []
+  searchUpdated: [search: NameSearch]
 }>()
 
 const firstName = ref<FirstName | null>(null)
@@ -19,6 +21,29 @@ const isSubmitting = ref(false)
 const isFinished = ref(false)
 const errorMessage = ref('')
 const lastAction = ref<NameDecisionChoice | null>(null)
+const isEditingFilters = ref(false)
+
+const activeFilterCount = computed(() => {
+  let count = 0
+
+  if (props.search.genders.length < 3) {
+    count += 1
+  }
+
+  if (props.search.origins.length > 0) {
+    count += 1
+  }
+
+  if (props.search.min_length !== null || props.search.max_length !== null) {
+    count += 1
+  }
+
+  if (props.search.first_letters.length > 0) {
+    count += 1
+  }
+
+  return count
+})
 
 const lastActionMessage = computed(() => {
   if (lastAction.value === 'liked') {
@@ -37,7 +62,7 @@ async function loadNextFirstName() {
   errorMessage.value = ''
 
   try {
-    const response = await authenticatedFetch(`/api/searches/${props.searchId}/next-first-name/`)
+    const response = await authenticatedFetch(`/api/searches/${props.search.id}/next-first-name/`)
 
     if (response.status === 204) {
       firstName.value = null
@@ -72,7 +97,7 @@ async function choose(choice: NameDecisionChoice) {
   errorMessage.value = ''
 
   try {
-    const response = await authenticatedFetch(`/api/searches/${props.searchId}/decisions/`, {
+    const response = await authenticatedFetch(`/api/searches/${props.search.id}/decisions/`, {
       method: 'POST',
       body: JSON.stringify({
         first_name_id: firstName.value.id,
@@ -95,6 +120,23 @@ async function choose(choice: NameDecisionChoice) {
   }
 }
 
+function openFilters() {
+  isEditingFilters.value = true
+}
+
+function closeFilters() {
+  isEditingFilters.value = false
+}
+
+async function handleFiltersSaved(updatedSearch: NameSearch) {
+  emit('searchUpdated', updatedSearch)
+  isEditingFilters.value = false
+  firstName.value = null
+  isFinished.value = false
+  lastAction.value = null
+  await loadNextFirstName()
+}
+
 onMounted(() => {
   void loadNextFirstName()
 })
@@ -102,15 +144,27 @@ onMounted(() => {
 
 <template>
   <section class="browser-shell">
-    <header>
+    <header class="browser-header">
       <button type="button" class="back-button" @click="emit('back')">
         <span>←</span>
         Retour au détail
       </button>
+
+      <button
+        v-if="canEditFilters"
+        type="button"
+        class="filters-button"
+        data-test="open-quick-filters"
+        @click="openFilters"
+      >
+        <span aria-hidden="true">☰</span>
+        Filtres
+        <strong v-if="activeFilterCount > 0">{{ activeFilterCount }}</strong>
+      </button>
     </header>
 
     <div class="title-block">
-      <span class="section-kicker">{{ searchTitle }}</span>
+      <span class="section-kicker">{{ search.title }}</span>
       <h2>Parcourir les prénoms</h2>
       <p>Découvre une proposition à la fois et indique simplement ce que tu en penses.</p>
     </div>
@@ -196,6 +250,10 @@ onMounted(() => {
 
       <p v-if="isSubmitting" class="saving-message" role="status">Enregistrement de ton choix…</p>
     </article>
+
+    <div v-if="isEditingFilters" class="filters-overlay" @click.self="closeFilters">
+      <SearchFiltersPanel :search="search" @close="closeFilters" @saved="handleFiltersSaved" />
+    </div>
   </section>
 </template>
 
@@ -203,6 +261,13 @@ onMounted(() => {
 .browser-shell {
   display: grid;
   gap: 20px;
+}
+
+.browser-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .back-button {
@@ -219,6 +284,49 @@ onMounted(() => {
 
 .back-button span {
   font-size: 1.15rem;
+}
+
+.filters-button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 13px;
+  border: 1px solid #e6d3bf;
+  border-radius: 12px;
+  color: #6f5540;
+  background: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  font-weight: 850;
+  box-shadow: 0 8px 20px rgba(91, 59, 29, 0.07);
+}
+
+.filters-button > span {
+  color: #e68822;
+  font-size: 0.95rem;
+}
+
+.filters-button strong {
+  display: grid;
+  min-width: 21px;
+  height: 21px;
+  place-items: center;
+  padding: 0 5px;
+  border-radius: 999px;
+  color: #ffffff;
+  background: #f49224;
+  font-size: 0.69rem;
+}
+
+.filters-overlay {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(64, 43, 25, 0.35);
+  backdrop-filter: blur(4px);
 }
 
 .title-block {
@@ -499,6 +607,11 @@ dd {
 }
 
 @media (max-width: 600px) {
+  .filters-overlay {
+    align-items: end;
+    padding: 6px 0 0;
+  }
+
   .name-card,
   .finished-card {
     padding: 28px 20px;
