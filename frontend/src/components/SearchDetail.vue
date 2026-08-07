@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 
 import { authenticatedFetch, getErrorMessage } from '../api/client'
 import type {
   FirstName,
+  FirstNameOrigin,
   NameSearch,
   NameSearchParticipant,
   ProfileLookup,
@@ -45,6 +46,12 @@ const invitationSuccess = ref('')
 const isEditingSearch = ref(false)
 const editTitle = ref('')
 const editGenders = ref<SearchGender[]>([])
+const originOptions = ref<FirstNameOrigin[]>([])
+const originLoadError = ref('')
+const editOrigins = ref<string[]>([])
+const editMinLength = ref('')
+const editMaxLength = ref('')
+const editFirstLetters = ref<string[]>([])
 const isSavingSearch = ref(false)
 const editError = ref('')
 const editSuccess = ref('')
@@ -71,6 +78,7 @@ const genderLabels: Record<SearchGender, string> = {
 }
 
 const genderOptions: SearchGender[] = ['female', 'male', 'mixed']
+const firstLetterOptions = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
 const currentParticipant = computed(() =>
   currentSearch.value.participants.find(
@@ -321,6 +329,10 @@ function formatDate(value: string) {
   }).format(date)
 }
 
+function originLabel(originId: string) {
+  return originOptions.value.find((origin) => origin.id === originId)?.label ?? originId
+}
+
 function resetInvitationForm() {
   invitationEmail.value = ''
   foundProfile.value = null
@@ -335,9 +347,17 @@ function openSearchEditor() {
 
   editTitle.value = currentSearch.value.title
   editGenders.value = [...currentSearch.value.genders]
+  editOrigins.value = [...currentSearch.value.origins]
+  editMinLength.value = currentSearch.value.min_length?.toString() ?? ''
+  editMaxLength.value = currentSearch.value.max_length?.toString() ?? ''
+  editFirstLetters.value = [...currentSearch.value.first_letters]
   editError.value = ''
   editSuccess.value = ''
   isEditingSearch.value = true
+
+  if (originOptions.value.length === 0) {
+    void loadOriginOptions()
+  }
 }
 
 function closeSearchEditor() {
@@ -360,8 +380,56 @@ function toggleEditGender(gender: SearchGender) {
   editGenders.value = [...editGenders.value, gender]
 }
 
+function toggleEditOrigin(origin: string) {
+  editError.value = ''
+
+  if (editOrigins.value.includes(origin)) {
+    editOrigins.value = editOrigins.value.filter((selectedOrigin) => selectedOrigin !== origin)
+    return
+  }
+
+  editOrigins.value = [...editOrigins.value, origin]
+}
+
+function toggleEditFirstLetter(firstLetter: string) {
+  editError.value = ''
+
+  if (editFirstLetters.value.includes(firstLetter)) {
+    editFirstLetters.value = editFirstLetters.value.filter(
+      (selectedLetter) => selectedLetter !== firstLetter,
+    )
+    return
+  }
+
+  editFirstLetters.value = [...editFirstLetters.value, firstLetter]
+}
+
+function parseOptionalLength(value: string) {
+  return value === '' ? null : Number(value)
+}
+
+async function loadOriginOptions() {
+  originLoadError.value = ''
+
+  try {
+    const response = await authenticatedFetch('/api/first-name-origins/')
+
+    if (!response.ok) {
+      originLoadError.value = await getErrorMessage(response, 'Impossible de charger les origines.')
+      return
+    }
+
+    originOptions.value = (await response.json()) as FirstNameOrigin[]
+  } catch (error) {
+    console.error('Échec du chargement des origines :', error)
+    originLoadError.value = 'Impossible de contacter Django pour charger les origines.'
+  }
+}
+
 async function saveSearchDetails() {
   const title = editTitle.value.trim()
+  const minLength = parseOptionalLength(editMinLength.value)
+  const maxLength = parseOptionalLength(editMaxLength.value)
 
   editError.value = ''
   editSuccess.value = ''
@@ -376,6 +444,19 @@ async function saveSearchDetails() {
     return
   }
 
+  if (
+    (minLength !== null && (!Number.isInteger(minLength) || minLength < 1 || minLength > 100)) ||
+    (maxLength !== null && (!Number.isInteger(maxLength) || maxLength < 1 || maxLength > 100))
+  ) {
+    editError.value = 'La longueur doit être un nombre entier compris entre 1 et 100.'
+    return
+  }
+
+  if (minLength !== null && maxLength !== null && minLength > maxLength) {
+    editError.value = 'La longueur minimale ne peut pas dépasser la longueur maximale.'
+    return
+  }
+
   isSavingSearch.value = true
 
   try {
@@ -384,6 +465,10 @@ async function saveSearchDetails() {
       body: JSON.stringify({
         title,
         genders: editGenders.value,
+        origins: editOrigins.value,
+        min_length: minLength,
+        max_length: maxLength,
+        first_letters: editFirstLetters.value,
       }),
     })
 
@@ -676,6 +761,12 @@ async function updateStatus(newStatus: SearchStatus) {
     isUpdatingStatus.value = false
   }
 }
+
+onMounted(() => {
+  if (currentSearch.value.origins.length > 0) {
+    void loadOriginOptions()
+  }
+})
 </script>
 
 <template>
@@ -775,7 +866,7 @@ async function updateStatus(newStatus: SearchStatus) {
 
           <div class="match-tags">
             <span>{{ genderLabels[firstName.gender] }}</span>
-            <span>{{ firstName.origin || 'Origine non renseignée' }}</span>
+            <span>{{ firstName.origin_label || 'Origine non renseignée' }}</span>
           </div>
 
           <div class="meaning-block">
@@ -877,7 +968,7 @@ async function updateStatus(newStatus: SearchStatus) {
 
           <div class="match-tags">
             <span>{{ genderLabels[firstName.gender] }}</span>
-            <span>{{ firstName.origin || 'Origine non renseignée' }}</span>
+            <span>{{ firstName.origin_label || 'Origine non renseignée' }}</span>
           </div>
 
           <div class="meaning-block">
@@ -913,6 +1004,29 @@ async function updateStatus(newStatus: SearchStatus) {
           <div class="gender-list" aria-label="Types de prénoms recherchés">
             <span v-for="gender in currentSearch.genders" :key="gender">
               {{ genderLabels[gender] }}
+            </span>
+          </div>
+
+          <div class="active-filter-list" aria-label="Filtres de la recherche">
+            <span v-if="currentSearch.origins.length > 0">
+              Origines : {{ currentSearch.origins.map(originLabel).join(', ') }}
+            </span>
+            <span v-if="currentSearch.min_length !== null || currentSearch.max_length !== null">
+              Longueur : {{ currentSearch.min_length ?? 'sans minimum' }} à
+              {{ currentSearch.max_length ?? 'sans maximum' }} lettres
+            </span>
+            <span v-if="currentSearch.first_letters.length > 0">
+              Initiales : {{ currentSearch.first_letters.join(', ') }}
+            </span>
+            <span
+              v-if="
+                currentSearch.origins.length === 0 &&
+                currentSearch.min_length === null &&
+                currentSearch.max_length === null &&
+                currentSearch.first_letters.length === 0
+              "
+            >
+              Aucun filtre supplémentaire
             </span>
           </div>
         </div>
@@ -967,6 +1081,83 @@ async function updateStatus(newStatus: SearchStatus) {
                   @change="toggleEditGender(gender)"
                 />
                 <span>{{ genderLabels[gender] }}</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Origines</legend>
+            <p class="edit-filter-help">
+              Aucune sélection signifie que toutes les origines sont admises.
+            </p>
+
+            <p v-if="originLoadError" class="edit-search-error" role="alert">
+              {{ originLoadError }}
+            </p>
+
+            <div v-else class="edit-origin-grid">
+              <label v-for="origin in originOptions" :key="origin.id" :title="origin.description">
+                <input
+                  type="checkbox"
+                  :checked="editOrigins.includes(origin.id)"
+                  :disabled="isSavingSearch"
+                  :data-test="`edit-search-origin-${origin.id}`"
+                  @change="toggleEditOrigin(origin.id)"
+                />
+                <span>{{ origin.label }}</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Longueur du prénom</legend>
+            <div class="edit-length-grid">
+              <label>
+                Minimum
+                <input
+                  v-model="editMinLength"
+                  data-test="edit-search-min-length"
+                  type="number"
+                  min="1"
+                  max="100"
+                  inputmode="numeric"
+                  placeholder="Sans minimum"
+                  :disabled="isSavingSearch"
+                />
+              </label>
+
+              <label>
+                Maximum
+                <input
+                  v-model="editMaxLength"
+                  data-test="edit-search-max-length"
+                  type="number"
+                  min="1"
+                  max="100"
+                  inputmode="numeric"
+                  placeholder="Sans maximum"
+                  :disabled="isSavingSearch"
+                />
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Première lettre</legend>
+            <p class="edit-filter-help">
+              Les lettres accentuées sont regroupées avec leur lettre principale.
+            </p>
+
+            <div class="edit-first-letter-grid">
+              <label v-for="firstLetter in firstLetterOptions" :key="firstLetter">
+                <input
+                  type="checkbox"
+                  :checked="editFirstLetters.includes(firstLetter)"
+                  :disabled="isSavingSearch"
+                  :data-test="`edit-search-first-letter-${firstLetter}`"
+                  @change="toggleEditFirstLetter(firstLetter)"
+                />
+                <span>{{ firstLetter }}</span>
               </label>
             </div>
           </fieldset>
@@ -1699,6 +1890,23 @@ async function updateStatus(newStatus: SearchStatus) {
   background: #fff0d8;
 }
 
+.active-filter-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.active-filter-list span {
+  padding: 6px 10px;
+  border: 1px solid #d7e9ee;
+  border-radius: 999px;
+  color: #376978;
+  background: #edf9fc;
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
 .hero-meta {
   display: grid;
   min-width: 210px;
@@ -1809,6 +2017,101 @@ async function updateStatus(newStatus: SearchStatus) {
 
 .edit-gender-grid input:focus-visible + span {
   outline: 3px solid rgba(239, 160, 77, 0.22);
+}
+
+.edit-filter-help {
+  margin: -3px 0 10px;
+  color: #8b7765;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.edit-origin-grid {
+  display: flex;
+  max-height: 190px;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 10px;
+  overflow-y: auto;
+  border: 1px solid #e5d6c7;
+  border-radius: 12px;
+  background: #fffdf9;
+}
+
+.edit-origin-grid label,
+.edit-first-letter-grid label {
+  cursor: pointer;
+}
+
+.edit-origin-grid input,
+.edit-first-letter-grid input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.edit-origin-grid span,
+.edit-first-letter-grid span {
+  display: grid;
+  place-items: center;
+  border: 1px solid #e5d6c7;
+  color: #765f4a;
+  background: #fffaf4;
+  font-weight: 800;
+}
+
+.edit-origin-grid span {
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 9px;
+  font-size: 0.76rem;
+}
+
+.edit-origin-grid input:checked + span,
+.edit-first-letter-grid input:checked + span {
+  border-color: #eda14f;
+  color: #85511e;
+  background: #fff0d8;
+}
+
+.edit-origin-grid input:focus-visible + span,
+.edit-first-letter-grid input:focus-visible + span {
+  outline: 3px solid rgba(239, 160, 77, 0.22);
+}
+
+.edit-length-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.edit-length-grid label {
+  display: grid;
+  gap: 7px;
+}
+
+.edit-length-grid input {
+  width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 0 13px;
+  border: 1px solid #dfcdbb;
+  border-radius: 11px;
+  color: #4d3a29;
+  background: #fffdf9;
+  font: inherit;
+}
+
+.edit-first-letter-grid {
+  display: grid;
+  grid-template-columns: repeat(13, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.edit-first-letter-grid span {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  font-size: 0.78rem;
 }
 
 .edit-search-error {
@@ -2408,6 +2711,14 @@ async function updateStatus(newStatus: SearchStatus) {
 
   .edit-gender-grid {
     grid-template-columns: 1fr;
+  }
+
+  .edit-length-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .edit-first-letter-grid {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
   }
 
   .edit-search-actions {

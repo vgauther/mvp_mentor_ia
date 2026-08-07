@@ -1,6 +1,8 @@
 from django.db import models
 from django.db.models.functions import Lower
+
 from .first_name_origins import FIRST_NAME_ORIGIN_CHOICES
+
 
 class Profile(models.Model):
     keycloak_id = models.CharField(
@@ -87,6 +89,16 @@ class NameSearch(models.Model):
     )
     title = models.CharField(max_length=150)
     genders = models.JSONField(default=default_search_genders)
+    origins = models.JSONField(default=list)
+    min_length = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+    )
+    max_length = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+    )
+    first_letters = models.JSONField(default=list)
     status = models.CharField(
         max_length=10,
         choices=Status.choices,

@@ -65,6 +65,10 @@ class NextFirstNameViewTests(APITestCase):
             NameSearchParticipant.InvitationStatus.ACCEPTED
         ),
         genders=None,
+        origins=None,
+        min_length=None,
+        max_length=None,
+        first_letters=None,
     ):
         search_data = {
             "creator": creator or self.profile,
@@ -72,6 +76,14 @@ class NextFirstNameViewTests(APITestCase):
         }
         if genders is not None:
             search_data["genders"] = genders
+        if origins is not None:
+            search_data["origins"] = origins
+        if min_length is not None:
+            search_data["min_length"] = min_length
+        if max_length is not None:
+            search_data["max_length"] = max_length
+        if first_letters is not None:
+            search_data["first_letters"] = first_letters
 
         search = NameSearch.objects.create(**search_data)
         participant = NameSearchParticipant.objects.create(
@@ -145,6 +157,57 @@ class NextFirstNameViewTests(APITestCase):
                 )
                 self.assertIn("genders", response.data)
 
+    def test_creating_search_saves_additional_filters(self):
+        response = self.client.post(
+            reverse("name-search-list-create"),
+            {
+                "title": "Filtres précis",
+                "origins": ["latine", "grecque", "latine"],
+                "min_length": 4,
+                "max_length": 8,
+                "first_letters": ["a", "E", "a"],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["origins"], ["latine", "grecque"])
+        self.assertEqual(response.data["min_length"], 4)
+        self.assertEqual(response.data["max_length"], 8)
+        self.assertEqual(response.data["first_letters"], ["A", "E"])
+
+        search = NameSearch.objects.get(id=response.data["id"])
+        self.assertEqual(search.origins, ["latine", "grecque"])
+        self.assertEqual(search.min_length, 4)
+        self.assertEqual(search.max_length, 8)
+        self.assertEqual(search.first_letters, ["A", "E"])
+
+    def test_creating_search_rejects_invalid_additional_filters(self):
+        invalid_payloads = (
+            {"origins": ["unknown"]},
+            {"min_length": 0},
+            {"max_length": 101},
+            {"min_length": 8, "max_length": 4},
+            {"first_letters": ["É"]},
+            {"first_letters": ["AB"]},
+        )
+
+        for payload in invalid_payloads:
+            with self.subTest(payload=payload):
+                response = self.client.post(
+                    reverse("name-search-list-create"),
+                    {
+                        "title": "Recherche invalide",
+                        **payload,
+                    },
+                    format="json",
+                )
+
+                self.assertEqual(
+                    response.status_code,
+                    status.HTTP_400_BAD_REQUEST,
+                )
+
     def test_default_filters_include_every_gender(self):
         search, _ = self.create_search()
 
@@ -156,6 +219,10 @@ class NextFirstNameViewTests(APITestCase):
                 FirstName.Gender.MIXED,
             ],
         )
+        self.assertEqual(search.origins, [])
+        self.assertIsNone(search.min_length)
+        self.assertIsNone(search.max_length)
+        self.assertEqual(search.first_letters, [])
 
     def test_next_first_name_respects_each_gender_filter(self):
         first_names_by_gender = {
@@ -186,6 +253,92 @@ class NextFirstNameViewTests(APITestCase):
                     response.data["id"],
                     expected_first_name.id,
                 )
+
+    def test_next_first_name_respects_origin_filter(self):
+        expected_first_name = FirstName.objects.create(
+            name="Flora",
+            gender=FirstName.Gender.FEMALE,
+            origin="latine",
+        )
+        FirstName.objects.create(
+            name="Freya",
+            gender=FirstName.Gender.FEMALE,
+            origin="nordique_balte",
+        )
+        search, _ = self.create_search(
+            genders=[FirstName.Gender.FEMALE],
+            origins=["latine"],
+        )
+
+        response = self.client.get(
+            reverse("next-first-name", kwargs={"search_id": search.id})
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["id"], expected_first_name.id)
+
+    def test_next_first_name_respects_length_range(self):
+        expected_first_name = FirstName.objects.create(
+            name="Louise",
+            gender=FirstName.Gender.FEMALE,
+        )
+        search, _ = self.create_search(
+            genders=[FirstName.Gender.FEMALE],
+            min_length=6,
+            max_length=6,
+        )
+
+        response = self.client.get(
+            reverse("next-first-name", kwargs={"search_id": search.id})
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["id"], expected_first_name.id)
+
+    def test_first_letter_filter_includes_accented_variants(self):
+        expected_first_name = FirstName.objects.create(
+            name="Élodie",
+            gender=FirstName.Gender.FEMALE,
+            origin="francaise",
+        )
+        search, _ = self.create_search(
+            genders=[FirstName.Gender.FEMALE],
+            origins=["francaise"],
+            first_letters=["E"],
+        )
+
+        response = self.client.get(
+            reverse("next-first-name", kwargs={"search_id": search.id})
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["id"], expected_first_name.id)
+
+    def test_next_first_name_combines_all_filters(self):
+        expected_first_name = FirstName.objects.create(
+            name="Amalia",
+            gender=FirstName.Gender.FEMALE,
+            origin="germanique",
+        )
+        FirstName.objects.create(
+            name="Amélia",
+            gender=FirstName.Gender.FEMALE,
+            origin="latine",
+        )
+        search, _ = self.create_search(
+            genders=[FirstName.Gender.FEMALE],
+            origins=["germanique"],
+            min_length=6,
+            max_length=6,
+            first_letters=["A"],
+        )
+
+        response = self.client.get(
+            reverse("next-first-name", kwargs={"search_id": search.id})
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["id"], expected_first_name.id)
 
     def test_next_first_name_uses_random_database_order(self):
         search, _ = self.create_search()

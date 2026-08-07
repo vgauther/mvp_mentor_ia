@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
+from .first_name_filters import FIRST_LETTERS
 from .first_name_origins import get_origin_description
-
 from .models import (
     FirstName,
     NameDecision,
@@ -174,10 +174,12 @@ class FirstNameSerializer(serializers.ModelSerializer):
         )
         read_only_fields = fields
 
+
 class FirstNameOriginSerializer(serializers.Serializer):
     id = serializers.CharField(read_only=True)
     label = serializers.CharField(read_only=True)
     description = serializers.CharField(read_only=True)
+
 
 class NameSearchParticipantSerializer(serializers.ModelSerializer):
     profile = ProfileSummarySerializer(read_only=True)
@@ -213,6 +215,33 @@ class NameSearchSerializer(serializers.ModelSerializer):
         allow_empty=False,
         required=False,
     )
+    origins = serializers.ListField(
+        child=serializers.ChoiceField(
+            choices=FirstName._meta.get_field("origin").choices,
+        ),
+        allow_empty=True,
+        required=False,
+    )
+    min_length = serializers.IntegerField(
+        min_value=1,
+        max_value=100,
+        allow_null=True,
+        required=False,
+    )
+    max_length = serializers.IntegerField(
+        min_value=1,
+        max_value=100,
+        allow_null=True,
+        required=False,
+    )
+    first_letters = serializers.ListField(
+        child=serializers.CharField(
+            min_length=1,
+            max_length=1,
+        ),
+        allow_empty=True,
+        required=False,
+    )
     creator = ProfileSummarySerializer(read_only=True)
     participants = NameSearchParticipantSerializer(
         many=True,
@@ -229,6 +258,10 @@ class NameSearchSerializer(serializers.ModelSerializer):
             "id",
             "title",
             "genders",
+            "origins",
+            "min_length",
+            "max_length",
+            "first_letters",
             "status",
             "status_label",
             "creator",
@@ -248,6 +281,53 @@ class NameSearchSerializer(serializers.ModelSerializer):
 
     def validate_genders(self, genders):
         return list(dict.fromkeys(genders))
+
+    def validate_origins(self, origins):
+        return list(dict.fromkeys(origins))
+
+    def validate_first_letters(self, first_letters):
+        normalized_letters = []
+
+        for first_letter in first_letters:
+            normalized_letter = first_letter.upper()
+
+            if normalized_letter not in FIRST_LETTERS:
+                raise serializers.ValidationError(
+                    "Chaque première lettre doit être comprise entre A et Z."
+                )
+
+            if normalized_letter not in normalized_letters:
+                normalized_letters.append(normalized_letter)
+
+        return normalized_letters
+
+    def validate(self, attributes):
+        attributes = super().validate(attributes)
+
+        current_min_length = (
+            self.instance.min_length if self.instance is not None else None
+        )
+        current_max_length = (
+            self.instance.max_length if self.instance is not None else None
+        )
+        min_length = attributes.get("min_length", current_min_length)
+        max_length = attributes.get("max_length", current_max_length)
+
+        if (
+            min_length is not None
+            and max_length is not None
+            and min_length > max_length
+        ):
+            raise serializers.ValidationError(
+                {
+                    "max_length": (
+                        "La longueur maximale doit être supérieure ou "
+                        "égale à la longueur minimale."
+                    )
+                }
+            )
+
+        return attributes
 
 
 class NameDecisionSerializer(serializers.ModelSerializer):

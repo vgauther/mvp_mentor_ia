@@ -30,7 +30,15 @@ export interface FirstName {
   gender: SearchGender
   gender_label: string
   origin: string
+  origin_label: string
+  origin_description: string
   meaning: string
+}
+
+export interface FirstNameOrigin {
+  id: string
+  label: string
+  description: string
 }
 
 export interface NameSearchParticipant {
@@ -67,6 +75,10 @@ export interface NameSearch {
   id: number
   title: string
   genders: SearchGender[]
+  origins: string[]
+  min_length: number | null
+  max_length: number | null
+  first_letters: string[]
   status: SearchStatus
   status_label: string
   creator: ProfileSummary

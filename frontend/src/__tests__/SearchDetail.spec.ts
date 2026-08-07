@@ -18,6 +18,10 @@ const activeSearch: NameSearch = {
   id: 41,
   title: 'Notre futur prénom',
   genders: ['female', 'male', 'mixed'],
+  origins: [],
+  min_length: null,
+  max_length: null,
+  first_letters: [],
   status: 'active',
   status_label: 'Active',
   creator: {
@@ -67,6 +71,14 @@ const pendingMember = {
   invitation_status_label: 'En attente',
 }
 
+const firstNameOrigins = [
+  {
+    id: 'latine',
+    label: 'Latine',
+    description: 'Origine latine.',
+  },
+]
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -82,15 +94,21 @@ afterEach(() => {
 })
 
 describe('SearchDetail', () => {
-  it('permet au propriétaire de modifier le titre et les genres', async () => {
+  it('permet au propriétaire de modifier les informations et les filtres', async () => {
     const updatedSearch: NameSearch = {
       ...activeSearch,
       title: 'Notre nouvelle recherche',
       genders: ['female'],
+      origins: ['latine'],
+      min_length: 4,
+      max_length: 8,
+      first_letters: ['A'],
       updated_at: '2026-08-04T10:00:00Z',
     }
 
-    authenticatedFetchMock.mockResolvedValueOnce(jsonResponse(updatedSearch))
+    authenticatedFetchMock
+      .mockResolvedValueOnce(jsonResponse(firstNameOrigins))
+      .mockResolvedValueOnce(jsonResponse(updatedSearch))
 
     const wrapper = mount(SearchDetail, {
       props: {
@@ -100,18 +118,27 @@ describe('SearchDetail', () => {
     })
 
     await wrapper.get('[data-test="edit-search-button"]').trigger('click')
+    await flushPromises()
     await wrapper.get('[data-test="edit-search-title"]').setValue('  Notre nouvelle recherche  ')
     await wrapper.get('[data-test="edit-search-gender-male"]').trigger('change')
     await wrapper.get('[data-test="edit-search-gender-mixed"]').trigger('change')
+    await wrapper.get('[data-test="edit-search-origin-latine"]').trigger('change')
+    await wrapper.get('[data-test="edit-search-min-length"]').setValue('4')
+    await wrapper.get('[data-test="edit-search-max-length"]').setValue('8')
+    await wrapper.get('[data-test="edit-search-first-letter-A"]').trigger('change')
     await wrapper.get('[data-test="edit-search-form"]').trigger('submit')
     await flushPromises()
 
-    expect(authenticatedFetchMock).toHaveBeenCalledTimes(1)
+    expect(authenticatedFetchMock).toHaveBeenCalledTimes(2)
     expect(authenticatedFetchMock).toHaveBeenCalledWith('/api/searches/41/', {
       method: 'PATCH',
       body: JSON.stringify({
         title: 'Notre nouvelle recherche',
         genders: ['female'],
+        origins: ['latine'],
+        min_length: 4,
+        max_length: 8,
+        first_letters: ['A'],
       }),
     })
     expect(wrapper.text()).toContain('Notre nouvelle recherche')
@@ -121,6 +148,8 @@ describe('SearchDetail', () => {
   })
 
   it('refuse localement une modification sans genre', async () => {
+    authenticatedFetchMock.mockResolvedValueOnce(jsonResponse(firstNameOrigins))
+
     const wrapper = mount(SearchDetail, {
       props: {
         search: activeSearch,
@@ -135,7 +164,8 @@ describe('SearchDetail', () => {
     await wrapper.get('[data-test="edit-search-form"]').trigger('submit')
     await flushPromises()
 
-    expect(authenticatedFetchMock).not.toHaveBeenCalled()
+    expect(authenticatedFetchMock).toHaveBeenCalledTimes(1)
+    expect(authenticatedFetchMock).toHaveBeenCalledWith('/api/first-name-origins/')
     expect(wrapper.get('[role="alert"]').text()).toBe('Sélectionne au moins un type de prénom.')
   })
 

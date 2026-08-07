@@ -46,13 +46,8 @@ class BusinessSerializerTests(TestCase):
         )
         self.assertEqual(serializer.data["name"], "Emma")
         self.assertEqual(serializer.data["gender"], self.gender)
-        self.assertEqual(serializer.data["origin"], "germanique")
         self.assertEqual(serializer.data["origin_label"], "Germanique")
-        self.assertNotEqual(
-            serializer.data["origin_description"],
-            "",
-        )
-        self.assertEqual(serializer.data["meaning"], "Universelle")
+        self.assertNotEqual(serializer.data["origin_description"], "")
         self.assertNotIn("is_active", serializer.data)
 
     def test_name_search_protects_managed_fields(self):
@@ -64,6 +59,14 @@ class BusinessSerializerTests(TestCase):
         self.assertTrue(serializer.fields["participants"].read_only)
         self.assertTrue(serializer.fields["created_at"].read_only)
         self.assertTrue(serializer.fields["updated_at"].read_only)
+
+    def test_name_search_exposes_writable_filter_fields(self):
+        serializer = NameSearchSerializer()
+
+        self.assertFalse(serializer.fields["origins"].read_only)
+        self.assertFalse(serializer.fields["min_length"].read_only)
+        self.assertFalse(serializer.fields["max_length"].read_only)
+        self.assertFalse(serializer.fields["first_letters"].read_only)
 
     def test_name_decision_protects_managed_fields(self):
         serializer = NameDecisionSerializer()

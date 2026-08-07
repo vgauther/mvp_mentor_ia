@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 
 import { authenticatedFetch, getErrorMessage } from '../api/client'
-import type { NameSearch, SearchGender, SearchStatus } from '../types/api'
+import type { FirstNameOrigin, NameSearch, SearchGender, SearchStatus } from '../types/api'
 
 const props = defineProps<{
   userId: number
@@ -22,6 +22,12 @@ const createError = ref('')
 const createSuccess = ref('')
 const newTitle = ref('')
 const newGenders = ref<SearchGender[]>(['female', 'male', 'mixed'])
+const originOptions = ref<FirstNameOrigin[]>([])
+const originLoadError = ref('')
+const newOrigins = ref<string[]>([])
+const newMinLength = ref('')
+const newMaxLength = ref('')
+const newFirstLetters = ref<string[]>([])
 
 const selectedStatus = ref<SearchStatus | 'all'>('all')
 
@@ -37,6 +43,8 @@ const statusOptions: { value: SearchStatus | 'all'; label: string }[] = [
   { value: 'completed', label: 'Terminées' },
   { value: 'archived', label: 'Archivées' },
 ]
+
+const firstLetterOptions = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
 const activeCount = computed(
   () => searches.value.filter((search) => search.status === 'active').length,
@@ -82,10 +90,32 @@ async function loadSearches() {
   }
 }
 
+async function loadOriginOptions() {
+  originLoadError.value = ''
+
+  try {
+    const response = await authenticatedFetch('/api/first-name-origins/')
+
+    if (!response.ok) {
+      originLoadError.value = await getErrorMessage(response, 'Impossible de charger les origines.')
+      return
+    }
+
+    originOptions.value = (await response.json()) as FirstNameOrigin[]
+  } catch (error) {
+    console.error('Échec du chargement des origines :', error)
+    originLoadError.value = 'Impossible de contacter Django pour charger les origines.'
+  }
+}
+
 function openCreateForm() {
   createError.value = ''
   createSuccess.value = ''
   isCreateOpen.value = true
+
+  if (originOptions.value.length === 0) {
+    void loadOriginOptions()
+  }
 }
 
 function closeCreateForm() {
@@ -105,8 +135,30 @@ function toggleGender(gender: SearchGender) {
   }
 }
 
+function toggleOrigin(origin: string) {
+  if (newOrigins.value.includes(origin)) {
+    newOrigins.value = newOrigins.value.filter((value) => value !== origin)
+  } else {
+    newOrigins.value = [...newOrigins.value, origin]
+  }
+}
+
+function toggleFirstLetter(firstLetter: string) {
+  if (newFirstLetters.value.includes(firstLetter)) {
+    newFirstLetters.value = newFirstLetters.value.filter((value) => value !== firstLetter)
+  } else {
+    newFirstLetters.value = [...newFirstLetters.value, firstLetter]
+  }
+}
+
+function parseOptionalLength(value: string) {
+  return value === '' ? null : Number(value)
+}
+
 async function createSearch() {
   const title = newTitle.value.trim()
+  const minLength = parseOptionalLength(newMinLength.value)
+  const maxLength = parseOptionalLength(newMaxLength.value)
 
   createError.value = ''
   createSuccess.value = ''
@@ -121,6 +173,19 @@ async function createSearch() {
     return
   }
 
+  if (
+    (minLength !== null && (!Number.isInteger(minLength) || minLength < 1 || minLength > 100)) ||
+    (maxLength !== null && (!Number.isInteger(maxLength) || maxLength < 1 || maxLength > 100))
+  ) {
+    createError.value = 'La longueur doit être un nombre entier compris entre 1 et 100.'
+    return
+  }
+
+  if (minLength !== null && maxLength !== null && minLength > maxLength) {
+    createError.value = 'La longueur minimale ne peut pas dépasser la longueur maximale.'
+    return
+  }
+
   isCreating.value = true
 
   try {
@@ -129,6 +194,10 @@ async function createSearch() {
       body: JSON.stringify({
         title,
         genders: newGenders.value,
+        origins: newOrigins.value,
+        min_length: minLength,
+        max_length: maxLength,
+        first_letters: newFirstLetters.value,
       }),
     })
 
@@ -143,6 +212,10 @@ async function createSearch() {
     selectedStatus.value = 'all'
     newTitle.value = ''
     newGenders.value = ['female', 'male', 'mixed']
+    newOrigins.value = []
+    newMinLength.value = ''
+    newMaxLength.value = ''
+    newFirstLetters.value = []
     isCreateOpen.value = false
     createSuccess.value = `La recherche « ${createdSearch.title} » a bien été créée.`
   } catch (error) {
@@ -395,6 +468,82 @@ onMounted(() => {
               >
                 <span>{{ option.symbol }}</span>
                 {{ option.label }}
+              </button>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Origines</legend>
+            <p class="filter-help">
+              Aucune sélection signifie que toutes les origines sont admises.
+            </p>
+
+            <p v-if="originLoadError" class="filter-load-error" role="alert">
+              {{ originLoadError }}
+            </p>
+
+            <div v-else class="origin-options">
+              <button
+                v-for="origin in originOptions"
+                :key="origin.id"
+                type="button"
+                :class="{ selected: newOrigins.includes(origin.id) }"
+                :title="origin.description"
+                :data-test="`create-search-origin-${origin.id}`"
+                @click="toggleOrigin(origin.id)"
+              >
+                {{ origin.label }}
+              </button>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Longueur du prénom</legend>
+            <div class="length-options">
+              <label>
+                Minimum
+                <input
+                  v-model="newMinLength"
+                  data-test="create-search-min-length"
+                  type="number"
+                  min="1"
+                  max="100"
+                  inputmode="numeric"
+                  placeholder="Sans minimum"
+                />
+              </label>
+
+              <label>
+                Maximum
+                <input
+                  v-model="newMaxLength"
+                  data-test="create-search-max-length"
+                  type="number"
+                  min="1"
+                  max="100"
+                  inputmode="numeric"
+                  placeholder="Sans maximum"
+                />
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Première lettre</legend>
+            <p class="filter-help">
+              Les lettres accentuées sont regroupées avec leur lettre principale.
+            </p>
+
+            <div class="first-letter-options">
+              <button
+                v-for="firstLetter in firstLetterOptions"
+                :key="firstLetter"
+                type="button"
+                :class="{ selected: newFirstLetters.includes(firstLetter) }"
+                :data-test="`create-search-first-letter-${firstLetter}`"
+                @click="toggleFirstLetter(firstLetter)"
+              >
+                {{ firstLetter }}
               </button>
             </div>
           </fieldset>
@@ -857,8 +1006,10 @@ onMounted(() => {
 
 .create-modal {
   position: relative;
-  width: min(540px, 100%);
+  width: min(720px, 100%);
+  max-height: calc(100vh - 44px);
   padding: 32px;
+  overflow-y: auto;
   border-radius: 25px;
   background: #fffdf9;
   box-shadow: 0 30px 80px rgba(61, 38, 17, 0.25);
@@ -959,6 +1110,82 @@ fieldset {
   box-shadow: inset 0 0 0 1px #f0bb79;
 }
 
+.filter-help {
+  margin: -2px 0 10px;
+  color: #8b7766;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.filter-load-error {
+  margin: 0;
+  color: #9d3e3e;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.origin-options {
+  display: flex;
+  max-height: 180px;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 10px;
+  overflow-y: auto;
+  border: 1px solid #eadccd;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.origin-options button,
+.first-letter-options button {
+  color: #705d4d;
+  border: 1px solid #e7d7c6;
+  background: #fffaf4;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.origin-options button {
+  padding: 7px 9px;
+  border-radius: 9px;
+  font-size: 11px;
+}
+
+.origin-options button.selected,
+.first-letter-options button.selected {
+  color: #874b08;
+  border-color: #f0bb79;
+  background: #fff0d8;
+  box-shadow: inset 0 0 0 1px #f0bb79;
+}
+
+.length-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.length-options label {
+  margin: 0;
+}
+
+.length-options input {
+  margin-top: 7px;
+}
+
+.first-letter-options {
+  display: grid;
+  grid-template-columns: repeat(13, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.first-letter-options button {
+  aspect-ratio: 1;
+  padding: 0;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;
@@ -1003,10 +1230,18 @@ button:disabled {
   .searches-panel {
     padding: 20px;
   }
+
+  .first-letter-options {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 480px) {
   .gender-options {
+    grid-template-columns: 1fr;
+  }
+
+  .length-options {
     grid-template-columns: 1fr;
   }
 

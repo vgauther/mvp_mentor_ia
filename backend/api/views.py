@@ -1,8 +1,8 @@
 from django.db import transaction
+from django.db.models.functions import Length
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.exceptions import NotFound
-from .first_name_origins import FIRST_NAME_ORIGINS
 from rest_framework.generics import (
     ListAPIView,
     ListCreateAPIView,
@@ -16,6 +16,8 @@ from rest_framework.permissions import (
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .first_name_filters import build_first_letter_regex
+from .first_name_origins import FIRST_NAME_ORIGINS
 from .models import (
     FirstName,
     NameDecision,
@@ -25,6 +27,7 @@ from .models import (
 )
 from .serializers import (
     CurrentProfileSerializer,
+    FirstNameOriginSerializer,
     FirstNameSerializer,
     NameDecisionSerializer,
     NameSearchSerializer,
@@ -33,7 +36,6 @@ from .serializers import (
     SearchInvitationCreateSerializer,
     SearchInvitationResponseSerializer,
     SearchInvitationSerializer,
-    FirstNameOriginSerializer,
 )
 
 
@@ -116,6 +118,7 @@ class FirstNameListView(ListAPIView):
     def get_queryset(self):
         return FirstName.objects.filter(is_active=True)
 
+
 class FirstNameOriginListView(APIView):
     def get(self, request):
         origins = [
@@ -126,13 +129,13 @@ class FirstNameOriginListView(APIView):
             }
             for origin_id, label, description in FIRST_NAME_ORIGINS
         ]
-
         serializer = FirstNameOriginSerializer(
             origins,
             many=True,
         )
 
         return Response(serializer.data)
+
 
 class NameSearchListCreateView(ListCreateAPIView):
     serializer_class = NameSearchSerializer
@@ -384,20 +387,39 @@ class NextFirstNameView(APIView):
 
     def get(self, request, search_id):
         participant = self.get_participant(search_id)
+        search = participant.search
 
         decided_first_name_ids = NameDecision.objects.filter(
             participant=participant,
         ).values("first_name_id")
 
-        first_name = (
-            FirstName.objects.filter(
-                is_active=True,
-                gender__in=participant.search.genders,
+        first_names = FirstName.objects.filter(
+            is_active=True,
+            gender__in=search.genders,
+        ).exclude(id__in=decided_first_name_ids)
+
+        if search.origins:
+            first_names = first_names.filter(origin__in=search.origins)
+
+        if search.min_length is not None or search.max_length is not None:
+            first_names = first_names.annotate(name_length=Length("name"))
+
+            if search.min_length is not None:
+                first_names = first_names.filter(
+                    name_length__gte=search.min_length,
+                )
+
+            if search.max_length is not None:
+                first_names = first_names.filter(
+                    name_length__lte=search.max_length,
+                )
+
+        if search.first_letters:
+            first_names = first_names.filter(
+                name__iregex=build_first_letter_regex(search.first_letters),
             )
-            .exclude(id__in=decided_first_name_ids)
-            .order_by("?")
-            .first()
-        )
+
+        first_name = first_names.order_by("?").first()
 
         if first_name is None:
             return Response(status=status.HTTP_204_NO_CONTENT)

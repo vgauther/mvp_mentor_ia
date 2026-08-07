@@ -33,6 +33,10 @@ const activeSearch = {
   id: 41,
   title: 'Notre futur prénom',
   genders: ['female', 'male', 'mixed'],
+  origins: [],
+  min_length: null,
+  max_length: null,
+  first_letters: [],
   status: 'active',
   status_label: 'Active',
   creator: {
@@ -59,6 +63,14 @@ const activeSearch = {
   created_at: '2026-08-04T08:00:00Z',
   updated_at: '2026-08-04T08:00:00Z',
 }
+
+const firstNameOrigins = [
+  {
+    id: 'latine',
+    label: 'Latine',
+    description: 'Origine latine.',
+  },
+]
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -143,7 +155,7 @@ describe('App', () => {
     expect(wrapper.text()).toContain('Créer ma première recherche')
   })
 
-  it('crée une recherche avec son titre et les genres sélectionnés', async () => {
+  it('crée une recherche avec son titre et les filtres sélectionnés', async () => {
     const createdSearch = {
       ...activeSearch,
       id: 42,
@@ -154,6 +166,7 @@ describe('App', () => {
       .fn<typeof fetch>()
       .mockResolvedValueOnce(jsonResponse(profile))
       .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse(firstNameOrigins))
       .mockResolvedValueOnce(jsonResponse(createdSearch, 201))
 
     vi.stubEnv('VITE_API_URL', 'http://127.0.0.1:8000')
@@ -164,14 +177,19 @@ describe('App', () => {
     await finishInitialLoading()
 
     await wrapper.get('[data-test="create-search-button"]').trigger('click')
+    await flushPromises()
     await wrapper.get('[data-test="search-title-input"]').setValue('Prénoms pour bébé')
+    await wrapper.get('[data-test="create-search-origin-latine"]').trigger('click')
+    await wrapper.get('[data-test="create-search-min-length"]').setValue('4')
+    await wrapper.get('[data-test="create-search-max-length"]').setValue('8')
+    await wrapper.get('[data-test="create-search-first-letter-A"]').trigger('click')
     await wrapper.get('[data-test="create-search-form"]').trigger('submit')
 
     await flushPromises()
 
-    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(fetchMock).toHaveBeenCalledTimes(4)
 
-    const createCall = fetchMock.mock.calls[2]
+    const createCall = fetchMock.mock.calls[3]
 
     if (!createCall) {
       throw new Error("L'appel de création vers Django n'a pas été effectué.")
@@ -186,6 +204,10 @@ describe('App', () => {
       JSON.stringify({
         title: 'Prénoms pour bébé',
         genders: ['female', 'male', 'mixed'],
+        origins: ['latine'],
+        min_length: 4,
+        max_length: 8,
+        first_letters: ['A'],
       }),
     )
     expect(headers.get('Authorization')).toBe('Bearer jeton-test')
@@ -199,6 +221,7 @@ describe('App', () => {
       .fn<typeof fetch>()
       .mockResolvedValueOnce(jsonResponse(profile))
       .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse(firstNameOrigins))
 
     vi.stubEnv('VITE_API_URL', 'http://127.0.0.1:8000')
     vi.stubGlobal('fetch', fetchMock)
@@ -212,7 +235,7 @@ describe('App', () => {
 
     await flushPromises()
 
-    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock).toHaveBeenCalledTimes(3)
     expect(wrapper.get('[role="alert"]').text()).toBe('Donne un nom à cette recherche.')
   })
 

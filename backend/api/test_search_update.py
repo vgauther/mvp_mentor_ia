@@ -67,7 +67,7 @@ class NameSearchUpdateTests(APITestCase):
             kwargs={"search_id": self.search.id},
         )
 
-    def test_owner_can_update_title_and_genders(self):
+    def test_owner_can_update_search_details_and_filters(self):
         response = self.client.patch(
             self.update_url(),
             {
@@ -77,6 +77,10 @@ class NameSearchUpdateTests(APITestCase):
                     FirstName.Gender.FEMALE,
                     FirstName.Gender.MALE,
                 ],
+                "origins": ["latine", "grecque", "latine"],
+                "min_length": 4,
+                "max_length": 9,
+                "first_letters": ["a", "M", "a"],
             },
             format="json",
         )
@@ -89,11 +93,19 @@ class NameSearchUpdateTests(APITestCase):
             self.search.genders,
             [FirstName.Gender.MALE, FirstName.Gender.FEMALE],
         )
+        self.assertEqual(self.search.origins, ["latine", "grecque"])
+        self.assertEqual(self.search.min_length, 4)
+        self.assertEqual(self.search.max_length, 9)
+        self.assertEqual(self.search.first_letters, ["A", "M"])
         self.assertEqual(response.data["title"], "Notre nouveau titre")
         self.assertEqual(
             response.data["genders"],
             [FirstName.Gender.MALE, FirstName.Gender.FEMALE],
         )
+        self.assertEqual(response.data["origins"], ["latine", "grecque"])
+        self.assertEqual(response.data["min_length"], 4)
+        self.assertEqual(response.data["max_length"], 9)
+        self.assertEqual(response.data["first_letters"], ["A", "M"])
 
     def test_partial_update_can_change_only_title(self):
         response = self.client.patch(
@@ -152,6 +164,11 @@ class NameSearchUpdateTests(APITestCase):
             {"title": ""},
             {"genders": []},
             {"genders": ["invalid"]},
+            {"origins": ["invalid"]},
+            {"min_length": 0},
+            {"max_length": 101},
+            {"min_length": 9, "max_length": 4},
+            {"first_letters": ["É"]},
         )
 
         for payload in invalid_payloads:
