@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.db.models import Count
 from django.db.models.functions import Length
 from django.shortcuts import get_object_or_404
 from rest_framework import status
@@ -385,6 +386,58 @@ class NextFirstNameView(APIView):
             ),
         )
 
+    def get_balanced_first_name(
+        self,
+        first_names,
+        participant,
+        selected_origins,
+    ):
+        unique_selected_origins = list(dict.fromkeys(selected_origins))
+
+        if len(unique_selected_origins) < 2:
+            return first_names.order_by("?").first()
+
+        available_origins = set(
+            first_names.values_list("origin", flat=True).distinct()
+        )
+        candidate_origins = [
+            origin
+            for origin in unique_selected_origins
+            if origin in available_origins
+        ]
+
+        if not candidate_origins:
+            return None
+
+        decision_counts = {
+            origin: 0
+            for origin in candidate_origins
+        }
+        counted_decisions = (
+            NameDecision.objects.filter(
+                participant=participant,
+                first_name__origin__in=candidate_origins,
+            )
+            .values("first_name__origin")
+            .annotate(total=Count("id"))
+        )
+
+        for counted_decision in counted_decisions:
+            decision_counts[counted_decision["first_name__origin"]] = (
+                counted_decision["total"]
+            )
+
+        least_seen_origin = min(
+            candidate_origins,
+            key=decision_counts.get,
+        )
+
+        return (
+            first_names.filter(origin=least_seen_origin)
+            .order_by("?")
+            .first()
+        )
+
     def get(self, request, search_id):
         participant = self.get_participant(search_id)
         search = participant.search
@@ -438,10 +491,18 @@ class NextFirstNameView(APIView):
                 id__in=other_liked_first_name_ids,
             )
 
-        first_name = preferred_first_names.order_by("?").first()
+        first_name = self.get_balanced_first_name(
+            preferred_first_names,
+            participant,
+            search.origins,
+        )
 
         if first_name is None:
-            first_name = first_names.order_by("?").first()
+            first_name = self.get_balanced_first_name(
+                first_names,
+                participant,
+                search.origins,
+            )
 
         if first_name is None:
             return Response(status=status.HTTP_204_NO_CONTENT)

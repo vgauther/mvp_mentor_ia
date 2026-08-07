@@ -277,6 +277,157 @@ class NextFirstNameViewTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["id"], expected_first_name.id)
 
+    def test_next_first_name_balances_selected_origins(self):
+        french_first_name = FirstName.objects.create(
+            name="Fleur",
+            gender=FirstName.Gender.FEMALE,
+            origin="francaise",
+        )
+        arabic_first_names = [
+            FirstName.objects.create(
+                name=name,
+                gender=FirstName.Gender.FEMALE,
+                origin="arabe",
+            )
+            for name in ("Aya", "Inaya", "Yasmine")
+        ]
+        search, participant = self.create_search(
+            genders=[FirstName.Gender.FEMALE],
+            origins=["francaise", "arabe"],
+        )
+
+        first_response = self.client.get(
+            reverse("next-first-name", kwargs={"search_id": search.id})
+        )
+
+        self.assertEqual(first_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(first_response.data["id"], french_first_name.id)
+
+        NameDecision.objects.create(
+            participant=participant,
+            first_name=french_first_name,
+            choice=NameDecision.Choice.REJECTED,
+        )
+
+        second_response = self.client.get(
+            reverse("next-first-name", kwargs={"search_id": search.id})
+        )
+
+        self.assertEqual(second_response.status_code, status.HTTP_200_OK)
+        self.assertIn(
+            second_response.data["id"],
+            [first_name.id for first_name in arabic_first_names],
+        )
+
+    def test_origin_balance_uses_previous_decisions(self):
+        french_first_name = FirstName.objects.create(
+            name="Fleur",
+            gender=FirstName.Gender.FEMALE,
+            origin="francaise",
+        )
+        arabic_first_name = FirstName.objects.create(
+            name="Aya",
+            gender=FirstName.Gender.FEMALE,
+            origin="arabe",
+        )
+        search, participant = self.create_search(
+            genders=[FirstName.Gender.FEMALE],
+            origins=["francaise", "arabe"],
+        )
+        already_decided_french_name = FirstName.objects.create(
+            name="Garance",
+            gender=FirstName.Gender.FEMALE,
+            origin="francaise",
+        )
+        NameDecision.objects.create(
+            participant=participant,
+            first_name=already_decided_french_name,
+            choice=NameDecision.Choice.REJECTED,
+        )
+
+        response = self.client.get(
+            reverse("next-first-name", kwargs={"search_id": search.id})
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["id"], arabic_first_name.id)
+        self.assertNotEqual(response.data["id"], french_first_name.id)
+
+    def test_origin_balance_falls_back_when_an_origin_is_exhausted(self):
+        french_first_name = FirstName.objects.create(
+            name="Fleur",
+            gender=FirstName.Gender.FEMALE,
+            origin="francaise",
+        )
+        arabic_first_name = FirstName.objects.create(
+            name="Aya",
+            gender=FirstName.Gender.FEMALE,
+            origin="arabe",
+        )
+        search, participant = self.create_search(
+            genders=[FirstName.Gender.FEMALE],
+            origins=["francaise", "arabe"],
+        )
+        NameDecision.objects.create(
+            participant=participant,
+            first_name=french_first_name,
+            choice=NameDecision.Choice.REJECTED,
+        )
+
+        response = self.client.get(
+            reverse("next-first-name", kwargs={"search_id": search.id})
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["id"], arabic_first_name.id)
+
+    def test_partner_priority_remains_stronger_than_origin_balance(self):
+        french_first_name = FirstName.objects.create(
+            name="Fleur",
+            gender=FirstName.Gender.FEMALE,
+            origin="francaise",
+        )
+        partner_liked_arabic_name = FirstName.objects.create(
+            name="Aya",
+            gender=FirstName.Gender.FEMALE,
+            origin="arabe",
+        )
+        search, participant = self.create_search(
+            genders=[FirstName.Gender.FEMALE],
+            origins=["francaise", "arabe"],
+        )
+        partner = NameSearchParticipant.objects.create(
+            search=search,
+            profile=self.other_profile,
+            role=NameSearchParticipant.Role.MEMBER,
+            invitation_status=(
+                NameSearchParticipant.InvitationStatus.ACCEPTED
+            ),
+        )
+        already_decided_arabic_name = FirstName.objects.create(
+            name="Inaya",
+            gender=FirstName.Gender.FEMALE,
+            origin="arabe",
+        )
+        NameDecision.objects.create(
+            participant=participant,
+            first_name=already_decided_arabic_name,
+            choice=NameDecision.Choice.REJECTED,
+        )
+        NameDecision.objects.create(
+            participant=partner,
+            first_name=partner_liked_arabic_name,
+            choice=NameDecision.Choice.LIKED,
+        )
+
+        response = self.client.get(
+            reverse("next-first-name", kwargs={"search_id": search.id})
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["id"], partner_liked_arabic_name.id)
+        self.assertNotEqual(response.data["id"], french_first_name.id)
+
     def test_next_first_name_respects_length_range(self):
         expected_first_name = FirstName.objects.create(
             name="Louise",
