@@ -10,6 +10,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   openSearch: [search: NameSearch]
+  openSearchDetails: [search: NameSearch]
 }>()
 
 const searches = ref<NameSearch[]>([])
@@ -418,14 +419,26 @@ onMounted(() => {
           <footer>
             <span>Créée le {{ formatShortDate(search.created_at) }}</span>
 
-            <button
-              type="button"
-              data-test="open-search-button"
-              @click="emit('openSearch', search)"
-            >
-              {{ search.status === 'active' ? 'Ouvrir' : 'Consulter' }}
-              <span>→</span>
-            </button>
+            <div class="search-actions">
+              <button
+                type="button"
+                class="details-button"
+                data-test="open-search-details-button"
+                @click="emit('openSearchDetails', search)"
+              >
+                {{ search.status === 'active' ? 'Détails' : 'Consulter' }}
+              </button>
+
+              <button
+                v-if="search.status === 'active'"
+                type="button"
+                data-test="open-search-button"
+                @click="emit('openSearch', search)"
+              >
+                Continuer
+                <span>→</span>
+              </button>
+            </div>
           </footer>
         </article>
       </div>
@@ -945,6 +958,7 @@ onMounted(() => {
 }
 
 .search-card footer {
+  flex-wrap: wrap;
   padding-top: 16px;
   border-top: 1px solid #f1e6dc;
 }
@@ -966,6 +980,19 @@ onMounted(() => {
   cursor: pointer;
   font-size: 12px;
   font-weight: 850;
+}
+
+.search-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.search-card footer .details-button {
+  color: #705d4d;
+  border: 1px solid #e4d5c5;
+  background: #fff;
 }
 
 .search-card footer button:disabled {

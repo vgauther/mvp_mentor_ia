@@ -12,6 +12,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   back: []
+  details: []
   searchUpdated: [search: NameSearch]
 }>()
 
@@ -145,10 +146,26 @@ onMounted(() => {
 <template>
   <section class="browser-shell">
     <header class="browser-header">
-      <button type="button" class="back-button" @click="emit('back')">
-        <span>←</span>
-        Retour au détail
-      </button>
+      <div class="navigation-actions">
+        <button
+          type="button"
+          class="back-button"
+          data-test="back-to-searches"
+          @click="emit('back')"
+        >
+          <span>←</span>
+          Retour aux recherches
+        </button>
+
+        <button
+          type="button"
+          class="details-button"
+          data-test="open-current-search-details"
+          @click="emit('details')"
+        >
+          Détails
+        </button>
+      </div>
 
       <button
         v-if="canEditFilters"
@@ -206,8 +223,13 @@ onMounted(() => {
         matchs obtenus avec l’autre participant.
       </p>
 
-      <button type="button" class="finish-button" @click="emit('back')">
-        Revenir à la recherche
+      <button
+        type="button"
+        class="finish-button"
+        data-test="back-to-searches"
+        @click="emit('back')"
+      >
+        Revenir aux recherches
       </button>
     </div>
 
@@ -270,6 +292,13 @@ onMounted(() => {
   gap: 12px;
 }
 
+.navigation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+}
+
 .back-button {
   display: inline-flex;
   align-items: center;
@@ -284,6 +313,17 @@ onMounted(() => {
 
 .back-button span {
   font-size: 1.15rem;
+}
+
+.details-button {
+  min-height: 36px;
+  padding: 0 12px;
+  color: #6f5540;
+  border: 1px solid #e6d3bf;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.88);
+  cursor: pointer;
+  font-weight: 850;
 }
 
 .filters-button {

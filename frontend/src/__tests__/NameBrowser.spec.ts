@@ -78,6 +78,22 @@ describe('NameBrowser', () => {
     expect(wrapper.text()).not.toContain('parcouru')
   })
 
+  it('permet d’ouvrir les détails de la recherche depuis le parcours', async () => {
+    authenticatedFetchMock.mockResolvedValueOnce(jsonResponse(firstName))
+
+    const wrapper = mount(NameBrowser, {
+      props: {
+        search: activeSearch,
+        canEditFilters: true,
+      },
+    })
+
+    await flushPromises()
+    await wrapper.get('[data-test="open-current-search-details"]').trigger('click')
+
+    expect(wrapper.emitted('details')).toHaveLength(1)
+  })
+
   it('enregistre un choix puis charge le prénom suivant', async () => {
     authenticatedFetchMock
       .mockResolvedValueOnce(jsonResponse(firstName))

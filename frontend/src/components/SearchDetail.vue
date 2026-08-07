@@ -14,10 +14,16 @@ import type {
 } from '../types/api'
 import NameBrowser from './NameBrowser.vue'
 
-const props = defineProps<{
-  search: NameSearch
-  userId: number
-}>()
+const props = withDefaults(
+  defineProps<{
+    search: NameSearch
+    userId: number
+    initialView?: 'browser' | 'detail'
+  }>(),
+  {
+    initialView: 'detail',
+  },
+)
 
 const emit = defineEmits<{
   back: []
@@ -28,7 +34,9 @@ const currentSearch = ref<NameSearch>(props.search)
 const isUpdatingStatus = ref(false)
 const statusError = ref('')
 const statusSuccess = ref('')
-const isBrowsingFirstNames = ref(false)
+const isBrowsingFirstNames = ref(
+  props.initialView === 'browser' && props.search.status === 'active',
+)
 const isViewingLikedFirstNames = ref(false)
 const likedFirstNames = ref<FirstName[]>([])
 const isLoadingLikedFirstNames = ref(false)
@@ -182,6 +190,7 @@ watch(
     currentSearch.value = search
 
     if (searchChanged) {
+      isBrowsingFirstNames.value = props.initialView === 'browser' && search.status === 'active'
       isEditingSearch.value = false
       editError.value = ''
       editSuccess.value = ''
@@ -780,7 +789,8 @@ onMounted(() => {
       v-if="isBrowsingFirstNames"
       :search="currentSearch"
       :can-edit-filters="isOwner"
-      @back="closeNameBrowser"
+      @back="emit('back')"
+      @details="closeNameBrowser"
       @search-updated="handleBrowserSearchUpdated"
     />
 

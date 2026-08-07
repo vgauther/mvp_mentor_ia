@@ -1,140 +1,150 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from "vue";
 
-import { authenticatedFetch } from './api/client'
-import logoIconUrl from './assets/brand/logo-icon.png'
-import keycloak from './auth/keycloak'
-import InvitationsDashboard from './components/InvitationsDashboard.vue'
-import ProfileSettings from './components/ProfileSettings.vue'
-import SearchDashboard from './components/SearchDashboard.vue'
-import SearchDetail from './components/SearchDetail.vue'
-import type { CurrentProfile, NameSearch } from './types/api'
+import { authenticatedFetch } from "./api/client";
+import logoIconUrl from "./assets/brand/logo-icon.png";
+import keycloak from "./auth/keycloak";
+import InvitationsDashboard from "./components/InvitationsDashboard.vue";
+import ProfileSettings from "./components/ProfileSettings.vue";
+import SearchDashboard from "./components/SearchDashboard.vue";
+import SearchDetail from "./components/SearchDetail.vue";
+import type { CurrentProfile, NameSearch } from "./types/api";
 
-type AppSection = 'searches' | 'invitations' | 'profile'
+type AppSection = "searches" | "invitations" | "profile";
+type SearchView = "browser" | "detail";
 
-const user = ref<CurrentProfile | null>(null)
-const isLoading = ref(true)
-const loadError = ref('')
-const activeSection = ref<AppSection>('searches')
-const selectedSearch = ref<NameSearch | null>(null)
+const user = ref<CurrentProfile | null>(null);
+const isLoading = ref(true);
+const loadError = ref("");
+const activeSection = ref<AppSection>("searches");
+const selectedSearch = ref<NameSearch | null>(null);
+const selectedSearchView = ref<SearchView>("detail");
 
 const visibleName = computed(() => {
   if (!user.value) {
-    return ''
+    return "";
   }
 
-  return user.value.display_name || user.value.username
-})
+  return user.value.display_name || user.value.username;
+});
 
 const initials = computed(() => {
-  const name = visibleName.value.trim()
+  const name = visibleName.value.trim();
 
   if (!name) {
-    return '?'
+    return "?";
   }
 
   return name
     .split(/\s+/)
     .slice(0, 2)
     .map((part) => part.charAt(0).toUpperCase())
-    .join('')
-})
+    .join("");
+});
 
 const pageTitle = computed(() => {
-  if (activeSection.value === 'profile') {
-    return 'Ton profil'
+  if (activeSection.value === "profile") {
+    return "Ton profil";
   }
 
-  if (activeSection.value === 'invitations') {
-    return 'Tes invitations'
+  if (activeSection.value === "invitations") {
+    return "Tes invitations";
   }
 
   if (selectedSearch.value) {
-    return 'Détail de ta recherche'
+    return "Détail de ta recherche";
   }
 
-  return 'Tes recherches de prénoms'
-})
+  return "Tes recherches de prénoms";
+});
 
 const pageDescription = computed(() => {
-  if (activeSection.value === 'profile') {
-    return 'Consulte tes informations et personnalise ton compte.'
+  if (activeSection.value === "profile") {
+    return "Consulte tes informations et personnalise ton compte.";
   }
 
-  if (activeSection.value === 'invitations') {
-    return 'Retrouve les recherches auxquelles un autre utilisateur t’invite à participer.'
+  if (activeSection.value === "invitations") {
+    return "Retrouve les recherches auxquelles un autre utilisateur t’invite à participer.";
   }
 
   if (selectedSearch.value) {
-    return 'Consulte les participants, le statut et les fonctionnalités de cette recherche.'
+    return "Consulte les participants, le statut et les fonctionnalités de cette recherche.";
   }
 
-  return 'Crée, partage et retrouve toutes tes recherches au même endroit.'
-})
+  return "Crée, partage et retrouve toutes tes recherches au même endroit.";
+});
 
 async function loadUser() {
-  isLoading.value = true
-  loadError.value = ''
+  isLoading.value = true;
+  loadError.value = "";
 
   try {
-    const response = await authenticatedFetch('/api/me/')
+    const response = await authenticatedFetch("/api/me/");
 
     if (!response.ok) {
-      throw new Error(`Réponse Django : ${response.status}`)
+      throw new Error(`Réponse Django : ${response.status}`);
     }
 
-    user.value = (await response.json()) as CurrentProfile
+    user.value = (await response.json()) as CurrentProfile;
   } catch (error) {
-    console.error("Échec de la récupération de l'utilisateur :", error)
-    loadError.value = 'Impossible de vérifier votre identité auprès de Django.'
+    console.error("Échec de la récupération de l'utilisateur :", error);
+    loadError.value = "Impossible de vérifier votre identité auprès de Django.";
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
 }
 
 function showSearches() {
-  activeSection.value = 'searches'
-  selectedSearch.value = null
+  activeSection.value = "searches";
+  selectedSearch.value = null;
 }
 
 function showProfile() {
-  activeSection.value = 'profile'
-  selectedSearch.value = null
+  activeSection.value = "profile";
+  selectedSearch.value = null;
 }
 
 function showInvitations() {
-  activeSection.value = 'invitations'
-  selectedSearch.value = null
+  activeSection.value = "invitations";
+  selectedSearch.value = null;
 }
 
 function openSearch(search: NameSearch) {
-  activeSection.value = 'searches'
-  selectedSearch.value = search
-  window.scrollTo({ top: 0, behavior: 'smooth' })
+  activeSection.value = "searches";
+  selectedSearch.value = search;
+  selectedSearchView.value = "browser";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function openSearchDetails(search: NameSearch) {
+  activeSection.value = "searches";
+  selectedSearch.value = search;
+  selectedSearchView.value = "detail";
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function closeSearch() {
-  selectedSearch.value = null
-  window.scrollTo({ top: 0, behavior: 'smooth' })
+  selectedSearch.value = null;
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function updateSelectedSearch(search: NameSearch) {
-  selectedSearch.value = search
+  selectedSearch.value = search;
 }
 
 function updateProfile(profile: CurrentProfile) {
-  user.value = profile
+  user.value = profile;
 }
 
 async function logout() {
   await keycloak.logout({
     redirectUri: window.location.origin,
-  })
+  });
 }
 
 onMounted(() => {
-  void loadUser()
-})
+  void loadUser();
+});
 </script>
 
 <template>
@@ -288,6 +298,7 @@ onMounted(() => {
           v-if="activeSection === 'searches' && selectedSearch"
           :search="selectedSearch"
           :user-id="user.id"
+          :initial-view="selectedSearchView"
           @back="closeSearch"
           @search-updated="updateSelectedSearch"
         />
@@ -296,15 +307,12 @@ onMounted(() => {
           v-else-if="activeSection === 'searches'"
           :user-id="user.id"
           @open-search="openSearch"
+          @open-search-details="openSearchDetails"
         />
 
         <InvitationsDashboard v-else-if="activeSection === 'invitations'" />
 
-        <ProfileSettings
-          v-else
-          :user="user"
-          @profile-updated="updateProfile"
-        />
+        <ProfileSettings v-else :user="user" @profile-updated="updateProfile" />
       </template>
 
       <footer class="app-footer">
@@ -330,8 +338,16 @@ onMounted(() => {
   margin: 0;
   color: #3f2e20;
   background:
-    radial-gradient(circle at 88% 4%, rgba(163, 223, 241, 0.32), transparent 27rem),
-    radial-gradient(circle at 25% 95%, rgba(255, 192, 101, 0.2), transparent 32rem),
+    radial-gradient(
+      circle at 88% 4%,
+      rgba(163, 223, 241, 0.32),
+      transparent 27rem
+    ),
+    radial-gradient(
+      circle at 25% 95%,
+      rgba(255, 192, 101, 0.2),
+      transparent 32rem
+    ),
     #fff9f0;
   font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
 }
