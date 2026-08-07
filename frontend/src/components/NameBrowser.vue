@@ -18,7 +18,6 @@ const isLoading = ref(true)
 const isSubmitting = ref(false)
 const isFinished = ref(false)
 const errorMessage = ref('')
-const handledCount = ref(0)
 const lastAction = ref<NameDecisionChoice | null>(null)
 
 const lastActionMessage = computed(() => {
@@ -30,10 +29,6 @@ const lastActionMessage = computed(() => {
     return 'Prénom refusé.'
   }
 
-  if (lastAction.value === 'skipped') {
-    return 'Prénom passé.'
-  }
-
   return ''
 })
 
@@ -42,9 +37,7 @@ async function loadNextFirstName() {
   errorMessage.value = ''
 
   try {
-    const response = await authenticatedFetch(
-      `/api/searches/${props.searchId}/next-first-name/`,
-    )
+    const response = await authenticatedFetch(`/api/searches/${props.searchId}/next-first-name/`)
 
     if (response.status === 204) {
       firstName.value = null
@@ -64,8 +57,7 @@ async function loadNextFirstName() {
     isFinished.value = false
   } catch (error) {
     console.error('Échec du chargement du prochain prénom :', error)
-    errorMessage.value =
-      'Impossible de contacter Django pour charger un prénom.'
+    errorMessage.value = 'Impossible de contacter Django pour charger un prénom.'
   } finally {
     isLoading.value = false
   }
@@ -80,32 +72,24 @@ async function choose(choice: NameDecisionChoice) {
   errorMessage.value = ''
 
   try {
-    const response = await authenticatedFetch(
-      `/api/searches/${props.searchId}/decisions/`,
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          first_name_id: firstName.value.id,
-          choice,
-        }),
-      },
-    )
+    const response = await authenticatedFetch(`/api/searches/${props.searchId}/decisions/`, {
+      method: 'POST',
+      body: JSON.stringify({
+        first_name_id: firstName.value.id,
+        choice,
+      }),
+    })
 
     if (!response.ok) {
-      errorMessage.value = await getErrorMessage(
-        response,
-        'Impossible d’enregistrer ton choix.',
-      )
+      errorMessage.value = await getErrorMessage(response, 'Impossible d’enregistrer ton choix.')
       return
     }
 
-    handledCount.value += 1
     lastAction.value = choice
     await loadNextFirstName()
   } catch (error) {
     console.error('Échec de l’enregistrement de la décision :', error)
-    errorMessage.value =
-      'Impossible de contacter Django pour enregistrer ton choix.'
+    errorMessage.value = 'Impossible de contacter Django pour enregistrer ton choix.'
   } finally {
     isSubmitting.value = false
   }
@@ -118,33 +102,20 @@ onMounted(() => {
 
 <template>
   <section class="browser-shell">
-    <header class="browser-header">
+    <header>
       <button type="button" class="back-button" @click="emit('back')">
         <span>←</span>
         Retour au détail
       </button>
-
-      <div class="progress-badge">
-        <span>{{ handledCount }}</span>
-        prénom{{ handledCount > 1 ? 's' : '' }}
-        parcouru{{ handledCount > 1 ? 's' : '' }}
-      </div>
     </header>
 
     <div class="title-block">
       <span class="section-kicker">{{ searchTitle }}</span>
       <h2>Parcourir les prénoms</h2>
-      <p>
-        Découvre une proposition à la fois et indique simplement ce que tu en
-        penses.
-      </p>
+      <p>Découvre une proposition à la fois et indique simplement ce que tu en penses.</p>
     </div>
 
-    <p
-      v-if="lastActionMessage && !errorMessage"
-      class="feedback success-feedback"
-      role="status"
-    >
+    <p v-if="lastActionMessage && !errorMessage" class="feedback success-feedback" role="status">
       {{ lastActionMessage }}
     </p>
 
@@ -161,23 +132,14 @@ onMounted(() => {
       </div>
     </div>
 
-    <div
-      v-else-if="errorMessage && !firstName"
-      class="state-card error-state"
-    >
+    <div v-else-if="errorMessage && !firstName" class="state-card error-state">
       <span class="state-symbol">!</span>
 
       <div>
         <strong>Le prénom n’a pas pu être chargé</strong>
         <p>Tu peux réessayer sans perdre les choix déjà enregistrés.</p>
 
-        <button
-          type="button"
-          class="retry-button"
-          @click="loadNextFirstName"
-        >
-          Réessayer
-        </button>
+        <button type="button" class="retry-button" @click="loadNextFirstName">Réessayer</button>
       </div>
     </div>
 
@@ -186,8 +148,8 @@ onMounted(() => {
       <h3>Tu as parcouru tous les prénoms disponibles</h3>
 
       <p>
-        Tes choix sont bien enregistrés. Tu pourras bientôt retrouver tes
-        prénoms aimés et les matchs obtenus avec l’autre participant.
+        Tes choix sont bien enregistrés. Tu pourras bientôt retrouver tes prénoms aimés et les
+        matchs obtenus avec l’autre participant.
       </p>
 
       <button type="button" class="finish-button" @click="emit('back')">
@@ -205,7 +167,7 @@ onMounted(() => {
         <dl>
           <div>
             <dt>Origine</dt>
-            <dd>{{ firstName.origin || 'Non renseignée' }}</dd>
+            <dd>{{ firstName.origin_label || 'Non renseignée' }}</dd>
           </div>
 
           <div>
@@ -226,30 +188,13 @@ onMounted(() => {
           Je n’aime pas
         </button>
 
-        <button
-          type="button"
-          class="skip-button"
-          :disabled="isSubmitting"
-          @click="choose('skipped')"
-        >
-          <span>→</span>
-          Passer
-        </button>
-
-        <button
-          type="button"
-          class="like-button"
-          :disabled="isSubmitting"
-          @click="choose('liked')"
-        >
+        <button type="button" class="like-button" :disabled="isSubmitting" @click="choose('liked')">
           <span>♥</span>
           J’aime
         </button>
       </div>
 
-      <p v-if="isSubmitting" class="saving-message" role="status">
-        Enregistrement de ton choix…
-      </p>
+      <p v-if="isSubmitting" class="saving-message" role="status">Enregistrement de ton choix…</p>
     </article>
   </section>
 </template>
@@ -258,13 +203,6 @@ onMounted(() => {
 .browser-shell {
   display: grid;
   gap: 20px;
-}
-
-.browser-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
 }
 
 .back-button {
@@ -281,20 +219,6 @@ onMounted(() => {
 
 .back-button span {
   font-size: 1.15rem;
-}
-
-.progress-badge {
-  padding: 9px 12px;
-  color: #7b5b3b;
-  border-radius: 999px;
-  background: #fff0d8;
-  font-size: 0.78rem;
-  font-weight: 800;
-}
-
-.progress-badge span {
-  color: #d8750d;
-  font-weight: 950;
 }
 
 .title-block {
@@ -443,16 +367,8 @@ onMounted(() => {
   overflow: hidden;
   padding: 42px;
   background:
-    radial-gradient(
-      circle at 95% 7%,
-      rgba(163, 223, 241, 0.5),
-      transparent 15rem
-    ),
-    radial-gradient(
-      circle at 4% 97%,
-      rgba(255, 192, 101, 0.28),
-      transparent 14rem
-    ),
+    radial-gradient(circle at 95% 7%, rgba(163, 223, 241, 0.5), transparent 15rem),
+    radial-gradient(circle at 4% 97%, rgba(255, 192, 101, 0.28), transparent 14rem),
     rgba(255, 255, 255, 0.96);
 }
 
@@ -520,7 +436,7 @@ dd {
 
 .decision-actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 11px;
   margin-top: 28px;
 }
@@ -561,12 +477,6 @@ dd {
   background: #fff2ef;
 }
 
-.skip-button {
-  color: #756555;
-  border: 1px solid #dfd4c9;
-  background: #f8f4ef;
-}
-
 .like-button {
   color: #ffffff;
   border: 1px solid #ee8b21;
@@ -589,14 +499,6 @@ dd {
 }
 
 @media (max-width: 600px) {
-  .browser-header {
-    align-items: flex-start;
-  }
-
-  .progress-badge {
-    text-align: center;
-  }
-
   .name-card,
   .finished-card {
     padding: 28px 20px;

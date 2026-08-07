@@ -22,7 +22,7 @@ export type SearchStatus = 'active' | 'completed' | 'archived'
 export type SearchGender = 'female' | 'male' | 'mixed'
 export type ParticipantRole = 'owner' | 'member'
 export type InvitationStatus = 'pending' | 'accepted' | 'declined'
-export type NameDecisionChoice = 'liked' | 'rejected' | 'skipped'
+export type NameDecisionChoice = 'liked' | 'rejected'
 
 export interface FirstName {
   id: number

@@ -34,14 +34,14 @@ class BusinessViewTests(APITestCase):
         self.active_first_name = FirstName.objects.create(
             name="Emma",
             gender=FirstName.Gender.FEMALE,
-            origin="Germanique",
+            origin="germanique",
             meaning="Universelle",
             is_active=True,
         )
         self.inactive_first_name = FirstName.objects.create(
             name="Alba",
             gender=FirstName.Gender.FEMALE,
-            origin="Latine",
+            origin="latine",
             meaning="Aube",
             is_active=False,
         )
@@ -75,6 +75,21 @@ class BusinessViewTests(APITestCase):
             self.active_first_name.id,
         )
         self.assertEqual(response.data[0]["name"], "Emma")
+
+    def test_first_name_origin_list_returns_complete_nomenclature(self):
+        response = self.client.get(reverse("first-name-origin-list"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 30)
+
+        arabic_origin = next(
+            origin
+            for origin in response.data
+            if origin["id"] == "arabe"
+        )
+
+        self.assertEqual(arabic_origin["label"], "Arabe")
+        self.assertNotEqual(arabic_origin["description"], "")
 
     def test_search_list_only_returns_accepted_searches(self):
         accepted_search = NameSearch.objects.create(
@@ -365,6 +380,39 @@ class BusinessViewTests(APITestCase):
             {
                 "first_name_id": self.active_first_name.id,
                 "choice": "invalid",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+        self.assertIn("choice", response.data)
+        self.assertEqual(NameDecision.objects.count(), 0)
+
+    def test_creating_decision_rejects_skipped_choice(self):
+        search = NameSearch.objects.create(
+            creator=self.profile,
+            title="Recherche sans bouton passer",
+        )
+        NameSearchParticipant.objects.create(
+            search=search,
+            profile=self.profile,
+            role=NameSearchParticipant.Role.OWNER,
+            invitation_status=(
+                NameSearchParticipant.InvitationStatus.ACCEPTED
+            ),
+        )
+
+        response = self.client.post(
+            reverse(
+                "name-decision-list-create",
+                kwargs={"search_id": search.id},
+            ),
+            {
+                "first_name_id": self.active_first_name.id,
+                "choice": "skipped",
             },
             format="json",
         )

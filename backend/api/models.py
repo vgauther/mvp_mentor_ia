@@ -182,7 +182,6 @@ class NameDecision(models.Model):
     class Choice(models.TextChoices):
         LIKED = "liked", "Aimé"
         REJECTED = "rejected", "Refusé"
-        SKIPPED = "skipped", "Passé"
 
     participant = models.ForeignKey(
         NameSearchParticipant,
