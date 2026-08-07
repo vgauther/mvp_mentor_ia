@@ -540,6 +540,35 @@ class NameDecisionListCreateView(APIView):
         serializer = NameDecisionSerializer(decisions, many=True)
         return Response(serializer.data)
 
+    @staticmethod
+    def is_match(search_id, first_name_id):
+        participant_ids = list(
+            NameSearchParticipant.objects.filter(
+                search_id=search_id,
+                invitation_status=(
+                    NameSearchParticipant.InvitationStatus.ACCEPTED
+                ),
+            )
+            .order_by("id")
+            .values_list("id", flat=True)
+        )
+
+        if len(participant_ids) != 2:
+            return False
+
+        liked_participant_count = (
+            NameDecision.objects.filter(
+                participant_id__in=participant_ids,
+                first_name_id=first_name_id,
+                choice=NameDecision.Choice.LIKED,
+            )
+            .values("participant_id")
+            .distinct()
+            .count()
+        )
+
+        return liked_participant_count == 2
+
     @transaction.atomic
     def post(self, request, search_id):
         participant = self.get_participant(search_id)
@@ -547,18 +576,31 @@ class NameDecisionListCreateView(APIView):
         serializer = NameDecisionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        first_name = serializer.validated_data["first_name"]
+
+        NameSearch.objects.select_for_update().get(id=participant.search_id)
+        was_match = self.is_match(participant.search_id, first_name.id)
+
         decision, created = NameDecision.objects.update_or_create(
             participant=participant,
-            first_name=serializer.validated_data["first_name"],
+            first_name=first_name,
             defaults={
                 "choice": serializer.validated_data["choice"],
             },
         )
 
         response_serializer = NameDecisionSerializer(decision)
+        match_created = (
+            not was_match
+            and self.is_match(participant.search_id, first_name.id)
+        )
+        response_data = {
+            **response_serializer.data,
+            "match_created": match_created,
+        }
 
         return Response(
-            response_serializer.data,
+            response_data,
             status=(
                 status.HTTP_201_CREATED
                 if created

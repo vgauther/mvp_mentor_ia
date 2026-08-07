@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 import { authenticatedFetch, getErrorMessage } from '../api/client'
 import type { FirstName, NameDecisionChoice, NameSearch } from '../types/api'
@@ -23,6 +23,9 @@ const isFinished = ref(false)
 const errorMessage = ref('')
 const lastAction = ref<NameDecisionChoice | null>(null)
 const isEditingFilters = ref(false)
+const matchNotification = ref<FirstName | null>(null)
+
+let matchNotificationTimeout: number | null = null
 
 const activeFilterCount = computed(() => {
   let count = 0
@@ -94,6 +97,8 @@ async function choose(choice: NameDecisionChoice) {
     return
   }
 
+  const decidedFirstName = firstName.value
+
   isSubmitting.value = true
   errorMessage.value = ''
 
@@ -101,7 +106,7 @@ async function choose(choice: NameDecisionChoice) {
     const response = await authenticatedFetch(`/api/searches/${props.search.id}/decisions/`, {
       method: 'POST',
       body: JSON.stringify({
-        first_name_id: firstName.value.id,
+        first_name_id: decidedFirstName.id,
         choice,
       }),
     })
@@ -111,7 +116,14 @@ async function choose(choice: NameDecisionChoice) {
       return
     }
 
+    const decision = (await response.json()) as { match_created?: boolean }
+
     lastAction.value = choice
+
+    if (decision.match_created) {
+      showMatchNotification(decidedFirstName)
+    }
+
     await loadNextFirstName()
   } catch (error) {
     console.error('Échec de l’enregistrement de la décision :', error)
@@ -119,6 +131,18 @@ async function choose(choice: NameDecisionChoice) {
   } finally {
     isSubmitting.value = false
   }
+}
+
+function showMatchNotification(matchedFirstName: FirstName) {
+  if (matchNotificationTimeout !== null) {
+    window.clearTimeout(matchNotificationTimeout)
+  }
+
+  matchNotification.value = matchedFirstName
+  matchNotificationTimeout = window.setTimeout(() => {
+    matchNotification.value = null
+    matchNotificationTimeout = null
+  }, 4000)
 }
 
 function openFilters() {
@@ -140,6 +164,12 @@ async function handleFiltersSaved(updatedSearch: NameSearch) {
 
 onMounted(() => {
   void loadNextFirstName()
+})
+
+onBeforeUnmount(() => {
+  if (matchNotificationTimeout !== null) {
+    window.clearTimeout(matchNotificationTimeout)
+  }
 })
 </script>
 
@@ -185,6 +215,23 @@ onMounted(() => {
       <h2>Parcourir les prénoms</h2>
       <p>Découvre une proposition à la fois et indique simplement ce que tu en penses.</p>
     </div>
+
+    <Transition name="match-toast">
+      <aside
+        v-if="matchNotification"
+        class="match-notification"
+        data-test="match-notification"
+        role="status"
+        aria-live="polite"
+      >
+        <span class="match-notification-icon" aria-hidden="true">♥</span>
+
+        <span>
+          <strong>C’est un match !</strong>
+          <small>Vous aimez tous les deux {{ matchNotification.name }}.</small>
+        </span>
+      </aside>
+    </Transition>
 
     <p v-if="lastActionMessage && !errorMessage" class="feedback success-feedback" role="status">
       {{ lastActionMessage }}
@@ -391,6 +438,62 @@ onMounted(() => {
 .title-block p {
   margin: 0;
   color: #887361;
+}
+
+.match-notification {
+  position: fixed;
+  z-index: 120;
+  right: 24px;
+  bottom: 24px;
+  display: flex;
+  width: min(360px, calc(100vw - 32px));
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 18px;
+  background: linear-gradient(135deg, #f49224, #e76f91);
+  box-shadow: 0 18px 45px rgba(137, 69, 43, 0.28);
+  pointer-events: none;
+}
+
+.match-notification-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.2);
+  font-size: 1.35rem;
+}
+
+.match-notification > span:last-child {
+  display: grid;
+  gap: 3px;
+}
+
+.match-notification strong {
+  font-size: 1rem;
+}
+
+.match-notification small {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.82rem;
+}
+
+.match-toast-enter-active,
+.match-toast-leave-active {
+  transition:
+    opacity 220ms ease,
+    transform 220ms ease;
+}
+
+.match-toast-enter-from,
+.match-toast-leave-to {
+  opacity: 0;
+  transform: translateY(16px) scale(0.96);
 }
 
 .feedback {
@@ -647,6 +750,11 @@ dd {
 }
 
 @media (max-width: 600px) {
+  .match-notification {
+    right: 16px;
+    bottom: 16px;
+  }
+
   .filters-overlay {
     align-items: end;
     padding: 6px 0 0;
@@ -666,6 +774,13 @@ dd {
     min-height: 55px;
     grid-template-columns: auto auto;
     justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .match-toast-enter-active,
+  .match-toast-leave-active {
+    transition: none;
   }
 }
 </style>

@@ -119,6 +119,31 @@ describe('NameBrowser', () => {
       }),
     })
     expect(authenticatedFetchMock).toHaveBeenNthCalledWith(3, '/api/searches/41/next-first-name/')
+    expect(wrapper.find('[data-test="match-notification"]').exists()).toBe(false)
+  })
+
+  it('affiche une notification de match sans bloquer le prénom suivant', async () => {
+    const nextFirstName = { ...firstName, id: 18, name: 'Alice' }
+
+    authenticatedFetchMock
+      .mockResolvedValueOnce(jsonResponse(firstName))
+      .mockResolvedValueOnce(jsonResponse({ id: 32, match_created: true }, 201))
+      .mockResolvedValueOnce(jsonResponse(nextFirstName))
+
+    const wrapper = mount(NameBrowser, {
+      props: {
+        search: activeSearch,
+        canEditFilters: true,
+      },
+    })
+
+    await flushPromises()
+    await wrapper.get('.like-button').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="match-notification"]').text()).toContain('C’est un match !')
+    expect(wrapper.get('[data-test="match-notification"]').text()).toContain('Élodie')
+    expect(wrapper.text()).toContain('Alice')
   })
 
   it('modifie les filtres depuis le parcours puis recharge une proposition', async () => {

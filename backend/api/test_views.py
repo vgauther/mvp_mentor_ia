@@ -271,6 +271,93 @@ class BusinessViewTests(APITestCase):
         )
         self.assertEqual(decision.participant, participant)
         self.assertEqual(decision.choice, NameDecision.Choice.LIKED)
+        self.assertFalse(response.data["match_created"])
+
+    def test_liking_name_creates_match_with_other_participant(self):
+        search = NameSearch.objects.create(
+            creator=self.other_profile,
+            title="Recherche avec match",
+        )
+        other_participant = NameSearchParticipant.objects.create(
+            search=search,
+            profile=self.other_profile,
+            role=NameSearchParticipant.Role.OWNER,
+            invitation_status=(
+                NameSearchParticipant.InvitationStatus.ACCEPTED
+            ),
+        )
+        NameSearchParticipant.objects.create(
+            search=search,
+            profile=self.profile,
+            role=NameSearchParticipant.Role.MEMBER,
+            invitation_status=(
+                NameSearchParticipant.InvitationStatus.ACCEPTED
+            ),
+        )
+        NameDecision.objects.create(
+            participant=other_participant,
+            first_name=self.active_first_name,
+            choice=NameDecision.Choice.LIKED,
+        )
+
+        response = self.client.post(
+            reverse(
+                "name-decision-list-create",
+                kwargs={"search_id": search.id},
+            ),
+            {
+                "first_name_id": self.active_first_name.id,
+                "choice": NameDecision.Choice.LIKED,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data["match_created"])
+
+    def test_existing_match_is_not_reported_as_new(self):
+        search = NameSearch.objects.create(
+            creator=self.other_profile,
+            title="Recherche avec match existant",
+        )
+        other_participant = NameSearchParticipant.objects.create(
+            search=search,
+            profile=self.other_profile,
+            role=NameSearchParticipant.Role.OWNER,
+            invitation_status=(
+                NameSearchParticipant.InvitationStatus.ACCEPTED
+            ),
+        )
+        participant = NameSearchParticipant.objects.create(
+            search=search,
+            profile=self.profile,
+            role=NameSearchParticipant.Role.MEMBER,
+            invitation_status=(
+                NameSearchParticipant.InvitationStatus.ACCEPTED
+            ),
+        )
+
+        for match_participant in (other_participant, participant):
+            NameDecision.objects.create(
+                participant=match_participant,
+                first_name=self.active_first_name,
+                choice=NameDecision.Choice.LIKED,
+            )
+
+        response = self.client.post(
+            reverse(
+                "name-decision-list-create",
+                kwargs={"search_id": search.id},
+            ),
+            {
+                "first_name_id": self.active_first_name.id,
+                "choice": NameDecision.Choice.LIKED,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data["match_created"])
 
     def test_posting_existing_decision_updates_it(self):
         search = NameSearch.objects.create(
@@ -304,6 +391,7 @@ class BusinessViewTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data["match_created"])
 
         decision.refresh_from_db()
         self.assertEqual(decision.choice, NameDecision.Choice.REJECTED)
