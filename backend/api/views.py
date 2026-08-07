@@ -419,7 +419,29 @@ class NextFirstNameView(APIView):
                 name__iregex=build_first_letter_regex(search.first_letters),
             )
 
-        first_name = first_names.order_by("?").first()
+        other_liked_first_name_ids = NameDecision.objects.filter(
+            participant__search=search,
+            participant__invitation_status=(
+                NameSearchParticipant.InvitationStatus.ACCEPTED
+            ),
+            choice=NameDecision.Choice.LIKED,
+        ).exclude(
+            participant=participant,
+        ).values("first_name_id")
+
+        if decided_first_name_ids.count() % 2 == 1:
+            preferred_first_names = first_names.filter(
+                id__in=other_liked_first_name_ids,
+            )
+        else:
+            preferred_first_names = first_names.exclude(
+                id__in=other_liked_first_name_ids,
+            )
+
+        first_name = preferred_first_names.order_by("?").first()
+
+        if first_name is None:
+            first_name = first_names.order_by("?").first()
 
         if first_name is None:
             return Response(status=status.HTTP_204_NO_CONTENT)

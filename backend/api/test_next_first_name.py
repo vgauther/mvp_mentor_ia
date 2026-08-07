@@ -419,6 +419,178 @@ class NextFirstNameViewTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["id"], self.female_first_name.id)
 
+    def test_first_turn_prefers_a_normal_name_over_a_partner_liked_name(self):
+        search, _ = self.create_search(
+            genders=[FirstName.Gender.FEMALE],
+        )
+        partner = NameSearchParticipant.objects.create(
+            search=search,
+            profile=self.other_profile,
+            role=NameSearchParticipant.Role.MEMBER,
+            invitation_status=(
+                NameSearchParticipant.InvitationStatus.ACCEPTED
+            ),
+        )
+        normal_candidate = FirstName.objects.create(
+            name="Louise",
+            gender=FirstName.Gender.FEMALE,
+        )
+        NameDecision.objects.create(
+            participant=partner,
+            first_name=self.female_first_name,
+            choice=NameDecision.Choice.LIKED,
+        )
+
+        response = self.client.get(
+            reverse(
+                "next-first-name",
+                kwargs={"search_id": search.id},
+            )
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["id"], normal_candidate.id)
+
+    def test_every_second_turn_prioritizes_a_name_liked_by_partner(self):
+        search, participant = self.create_search(
+            genders=[FirstName.Gender.FEMALE],
+        )
+        partner = NameSearchParticipant.objects.create(
+            search=search,
+            profile=self.other_profile,
+            role=NameSearchParticipant.Role.MEMBER,
+            invitation_status=(
+                NameSearchParticipant.InvitationStatus.ACCEPTED
+            ),
+        )
+        already_decided = FirstName.objects.create(
+            name="Alice",
+            gender=FirstName.Gender.FEMALE,
+        )
+        normal_candidate = FirstName.objects.create(
+            name="Louise",
+            gender=FirstName.Gender.FEMALE,
+        )
+        NameDecision.objects.create(
+            participant=participant,
+            first_name=already_decided,
+            choice=NameDecision.Choice.REJECTED,
+        )
+        NameDecision.objects.create(
+            participant=partner,
+            first_name=self.female_first_name,
+            choice=NameDecision.Choice.LIKED,
+        )
+
+        response = self.client.get(
+            reverse(
+                "next-first-name",
+                kwargs={"search_id": search.id},
+            )
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["id"], self.female_first_name.id)
+        self.assertNotEqual(response.data["id"], normal_candidate.id)
+
+    def test_partner_priority_falls_back_to_normal_candidates(self):
+        search, participant = self.create_search(
+            genders=[FirstName.Gender.FEMALE],
+        )
+        partner = NameSearchParticipant.objects.create(
+            search=search,
+            profile=self.other_profile,
+            role=NameSearchParticipant.Role.MEMBER,
+            invitation_status=(
+                NameSearchParticipant.InvitationStatus.ACCEPTED
+            ),
+        )
+        NameDecision.objects.create(
+            participant=participant,
+            first_name=self.mixed_first_name,
+            choice=NameDecision.Choice.REJECTED,
+        )
+        NameDecision.objects.create(
+            participant=partner,
+            first_name=self.male_first_name,
+            choice=NameDecision.Choice.LIKED,
+        )
+
+        response = self.client.get(
+            reverse(
+                "next-first-name",
+                kwargs={"search_id": search.id},
+            )
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["id"], self.female_first_name.id)
+
+    def test_partner_priority_excludes_names_already_decided(self):
+        search, participant = self.create_search(
+            genders=[FirstName.Gender.FEMALE],
+        )
+        partner = NameSearchParticipant.objects.create(
+            search=search,
+            profile=self.other_profile,
+            role=NameSearchParticipant.Role.MEMBER,
+            invitation_status=(
+                NameSearchParticipant.InvitationStatus.ACCEPTED
+            ),
+        )
+        remaining_first_name = FirstName.objects.create(
+            name="Louise",
+            gender=FirstName.Gender.FEMALE,
+        )
+        NameDecision.objects.create(
+            participant=participant,
+            first_name=self.female_first_name,
+            choice=NameDecision.Choice.REJECTED,
+        )
+        NameDecision.objects.create(
+            participant=partner,
+            first_name=self.female_first_name,
+            choice=NameDecision.Choice.LIKED,
+        )
+
+        response = self.client.get(
+            reverse(
+                "next-first-name",
+                kwargs={"search_id": search.id},
+            )
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["id"], remaining_first_name.id)
+
+    def test_normal_turn_uses_partner_liked_name_when_nothing_else_remains(self):
+        search, _ = self.create_search(
+            genders=[FirstName.Gender.FEMALE],
+        )
+        partner = NameSearchParticipant.objects.create(
+            search=search,
+            profile=self.other_profile,
+            role=NameSearchParticipant.Role.MEMBER,
+            invitation_status=(
+                NameSearchParticipant.InvitationStatus.ACCEPTED
+            ),
+        )
+        NameDecision.objects.create(
+            participant=partner,
+            first_name=self.female_first_name,
+            choice=NameDecision.Choice.LIKED,
+        )
+
+        response = self.client.get(
+            reverse(
+                "next-first-name",
+                kwargs={"search_id": search.id},
+            )
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["id"], self.female_first_name.id)
+
     def test_decisions_remain_isolated_between_searches(self):
         _, first_participant = self.create_search(
             title="Premier enfant",
