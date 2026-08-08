@@ -1,0 +1,81 @@
+/*
+ * Correctif v3 du bouton de retour.
+ */
+
+.lbp-home-return {
+  display: flex !important;
+  grid-column: 1 / -1;
+  align-items: center;
+  justify-content: center;
+  justify-self: stretch;
+  width: 100% !important;
+  max-width: 470px;
+  margin: 0 auto;
+  padding: 0 35px 29px;
+}
+
+/* Le JavaScript place le bloc comme dernier enfant de la carte. */
+.pf-v5-c-login__main > .lbp-home-return,
+.card-pf > .lbp-home-return {
+  width: 100% !important;
+  max-width: none;
+  margin: 0;
+  padding: 0 35px 29px;
+}
+
+.lbp-home-return__link {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 9px;
+  width: 100% !important;
+  min-height: 45px;
+  margin: 0 !important;
+  padding: 10px 17px !important;
+  color: #8d500c !important;
+  border: 1px solid var(--lbp-border, #ead9c8) !important;
+  border-radius: 12px !important;
+  background: #fffaf2 !important;
+  box-shadow: 0 8px 20px rgba(92, 57, 23, 0.08) !important;
+  font-size: 12px !important;
+  font-weight: 850 !important;
+  line-height: 1.2 !important;
+  text-align: center;
+  text-decoration: none !important;
+  transition:
+    transform 150ms ease,
+    border-color 150ms ease,
+    background-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.lbp-home-return__link:hover {
+  color: var(--lbp-pulpe-dark, #e47a08) !important;
+  border-color: #d8b990 !important;
+  background: #fff4e1 !important;
+  box-shadow: 0 10px 24px rgba(92, 57, 23, 0.12) !important;
+  text-decoration: none !important;
+  transform: translateY(-1px);
+}
+
+.lbp-home-return__link:focus-visible {
+  outline: 3px solid rgba(255, 164, 58, 0.25);
+  outline-offset: 3px;
+}
+
+.lbp-home-return__icon {
+  flex: 0 0 auto;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+@media (max-width: 600px) {
+  .lbp-home-return,
+  .pf-v5-c-login__main > .lbp-home-return,
+  .card-pf > .lbp-home-return {
+    padding-right: 23px;
+    padding-bottom: 24px;
+    padding-left: 23px;
+  }
+}
