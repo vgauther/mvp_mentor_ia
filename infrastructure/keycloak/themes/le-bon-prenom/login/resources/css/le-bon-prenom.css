@@ -1,12 +1,15 @@
 :root {
-  --lbp-primary: #6555a6;
-  --lbp-primary-hover: #56468f;
-  --lbp-pink: #cf7187;
-  --lbp-text: #29263b;
-  --lbp-muted: #777286;
-  --lbp-border: #e4deec;
-  --lbp-background: #fffaf8;
-  --lbp-error: #b33f56;
+  --lbp-pulpe: #ffa43a;
+  --lbp-pulpe-dark: #e47a08;
+  --lbp-solara: #ffc065;
+  --lbp-zephir: #fee4b8;
+  --lbp-mistral: #a3dff1;
+  --lbp-text: #3f2e20;
+  --lbp-muted: #887568;
+  --lbp-border: #ead9c8;
+  --lbp-surface: #ffffff;
+  --lbp-background: #fbfaf8;
+  --lbp-error: #a84444;
 }
 
 * {
@@ -29,16 +32,16 @@ body#keycloak-bg {
   color: var(--lbp-text);
   background:
     radial-gradient(
-      circle at 4% 8%,
-      rgba(255, 213, 220, 0.75),
-      transparent 31rem
+      circle at 8% 12%,
+      rgba(254, 228, 184, 0.88),
+      transparent 25rem
     ),
     radial-gradient(
-      circle at 94% 60%,
-      rgba(220, 212, 255, 0.68),
-      transparent 34rem
+      circle at 94% 84%,
+      rgba(163, 223, 241, 0.7),
+      transparent 28rem
     ),
-    linear-gradient(145deg, #fffaf8 0%, #f8f5ff 100%);
+    var(--lbp-background);
   font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
 }
 
@@ -53,23 +56,19 @@ body#keycloak-bg::after {
 }
 
 body#keycloak-bg::before {
-  top: 10%;
-  right: 8%;
-  width: 290px;
-  height: 290px;
-  background: linear-gradient(
-    145deg,
-    rgba(255, 208, 218, 0.55),
-    rgba(222, 214, 255, 0.62)
-  );
+  top: 8%;
+  right: 6%;
+  width: 270px;
+  height: 270px;
+  background: rgba(163, 223, 241, 0.58);
 }
 
 body#keycloak-bg::after {
-  bottom: 7%;
-  left: 7%;
-  width: 220px;
-  height: 220px;
-  background: rgba(255, 236, 214, 0.65);
+  bottom: 6%;
+  left: 6%;
+  width: 205px;
+  height: 205px;
+  background: rgba(255, 192, 101, 0.5);
 }
 
 .pf-v5-c-login {
@@ -83,15 +82,15 @@ body#keycloak-bg::after {
   grid-template-areas:
     "header"
     "main";
-  grid-template-columns: minmax(0, 480px);
-  gap: 24px;
+  grid-template-columns: minmax(0, 470px);
+  gap: 22px;
   justify-content: center;
-  width: min(100% - 32px, 480px);
+  width: min(100% - 32px, 470px);
   margin: 0 auto;
-  padding: 48px 0;
+  padding: 40px 0;
 }
 
-/* En-tête et identité de l’application */
+/* Identité de l'application */
 
 #kc-header {
   margin: 0;
@@ -101,36 +100,32 @@ body#keycloak-bg::after {
   display: flex;
   align-items: center;
   flex-direction: column;
-  gap: 9px;
-  color: var(--lbp-text) !important;
-  font-size: 25px;
+  gap: 7px;
+  color: var(--lbp-pulpe-dark) !important;
+  font-size: 24px;
   font-weight: 850;
   line-height: 1.15;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.035em;
   text-align: center;
   text-transform: none;
 }
 
 #kc-header-wrapper::before {
-  display: grid;
-  width: 52px;
-  height: 52px;
-  place-items: center;
-  color: white;
-  border-radius: 16px;
-  background: var(--lbp-primary);
-  box-shadow: 0 12px 28px rgba(101, 85, 166, 0.25);
-  content: "LBP";
-  font-size: 12px;
-  font-weight: 900;
-  letter-spacing: 0.08em;
+  display: block;
+  width: 62px;
+  height: 62px;
+  border-radius: 18px;
+  background: var(--lbp-zephir) url("../img/logo-icon.png") center / cover
+    no-repeat;
+  box-shadow: 0 12px 26px rgba(217, 113, 2, 0.16);
+  content: "";
 }
 
 #kc-header-wrapper::after {
   color: var(--lbp-muted);
   content: "Trouvez-le ensemble";
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 700;
   letter-spacing: 0;
 }
 
@@ -138,21 +133,21 @@ body#keycloak-bg::after {
 
 .pf-v5-c-login__main {
   overflow: hidden;
-  border: 1px solid rgba(88, 76, 141, 0.13);
-  border-radius: 25px;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 30px 75px rgba(72, 61, 111, 0.17);
-  backdrop-filter: blur(18px);
+  border: 1px solid rgba(126, 83, 35, 0.12);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 28px 68px rgba(92, 57, 23, 0.14);
+  backdrop-filter: blur(16px);
 }
 
 .pf-v5-c-login__main-header {
-  padding: 32px 36px 17px;
+  padding: 31px 35px 17px;
   border-top: 0;
   background: transparent;
 }
 
 .pf-v5-c-login__main-body {
-  padding: 0 36px 34px;
+  padding: 0 35px 33px;
   background: transparent;
 }
 
@@ -161,47 +156,62 @@ body#keycloak-bg::after {
 }
 
 .pf-v5-c-login__main-footer-band {
-  padding: 20px 36px;
-  border-top: 1px solid #eee9f3;
-  background: rgba(248, 246, 252, 0.78);
+  padding: 19px 35px;
+  border-top: 1px solid #f0e4d8;
+  background: #fffaf2;
 }
 
 #kc-page-title {
   margin: 0;
   color: var(--lbp-text);
-  font-size: 27px;
+  font-size: 28px;
   font-weight: 850;
   line-height: 1.2;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.04em;
+}
+
+#kc-page-title::after {
+  display: block;
+  margin-top: 9px;
+  color: var(--lbp-muted);
+  content: "Accédez à votre recherche de prénoms en toute sécurité.";
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: 0;
+}
+
+body:has(#kc-register-form) #kc-page-title::after {
+  content: "Quelques informations suffisent pour commencer votre recherche.";
+}
+
+body:has(#kc-reset-password-form) #kc-page-title::after {
+  content: "Nous vous aiderons à retrouver l'accès à votre espace.";
 }
 
 /* Formulaires */
 
 .pf-v5-c-form {
-  gap: 19px;
+  gap: 18px;
 }
 
 .pf-v5-c-form__label-text,
 .pf-v5-c-check__label {
-  color: #4a455b;
-  font-size: 13px;
-  font-weight: 750;
+  color: #5d4939;
+  font-size: 12px;
+  font-weight: 800;
 }
 
-/* Champs classiques */
-
 .pf-v5-c-form-control {
-  min-height: 48px;
+  min-height: 49px;
   overflow: hidden;
   color: var(--lbp-text);
   border: 1px solid var(--lbp-border) !important;
   border-radius: 12px;
   outline: none !important;
-  background: #fdfcff;
+  background: #fffdfa;
   box-shadow: none !important;
 }
-
-/* Suppression des bordures générées par PatternFly */
 
 .pf-v5-c-form-control::before,
 .pf-v5-c-form-control::after {
@@ -212,22 +222,20 @@ body#keycloak-bg::after {
 }
 
 .pf-v5-c-form-control:hover {
-  border-color: #bcb2d5 !important;
+  border-color: #d8b990 !important;
 }
 
 .pf-v5-c-form-control:focus,
 .pf-v5-c-form-control:focus-visible,
 .pf-v5-c-form-control:focus-within {
-  border-color: var(--lbp-primary) !important;
+  border-color: var(--lbp-pulpe) !important;
   outline: none !important;
-  box-shadow: 0 0 0 3px rgba(101, 85, 166, 0.13) !important;
+  box-shadow: 0 0 0 3px rgba(255, 164, 58, 0.16) !important;
 }
-
-/* Véritable input placé à l’intérieur du composant PatternFly */
 
 .pf-v5-c-form-control input {
   width: 100%;
-  min-height: 46px;
+  min-height: 47px;
   padding: 0 15px;
   border: 0 !important;
   outline: none !important;
@@ -242,66 +250,53 @@ body#keycloak-bg::after {
   box-shadow: none !important;
 }
 
-/* Lorsque l’input porte lui-même la classe */
-
 input.pf-v5-c-form-control {
   padding: 0 15px;
 }
 
 input.pf-v5-c-form-control:focus,
 input.pf-v5-c-form-control:focus-visible {
-  border-color: var(--lbp-primary) !important;
+  border-color: var(--lbp-pulpe) !important;
   outline: none !important;
-  box-shadow: 0 0 0 3px rgba(101, 85, 166, 0.13) !important;
+  box-shadow: 0 0 0 3px rgba(255, 164, 58, 0.16) !important;
 }
-
-/* Groupe utilisé notamment pour le mot de passe */
 
 .pf-v5-c-input-group {
   overflow: hidden;
   border: 1px solid var(--lbp-border) !important;
   border-radius: 12px;
-  background: #fdfcff;
+  background: #fffdfa;
   box-shadow: none !important;
 }
 
 .pf-v5-c-input-group:hover {
-  border-color: #bcb2d5 !important;
+  border-color: #d8b990 !important;
 }
 
 .pf-v5-c-input-group:focus-within {
-  border-color: var(--lbp-primary) !important;
+  border-color: var(--lbp-pulpe) !important;
   outline: none !important;
-  box-shadow: 0 0 0 3px rgba(101, 85, 166, 0.13) !important;
+  box-shadow: 0 0 0 3px rgba(255, 164, 58, 0.16) !important;
 }
 
-/* Empêche une deuxième bordure dans le groupe */
-
-.pf-v5-c-input-group .pf-v5-c-form-control {
-  border: 0 !important;
-  border-radius: 0;
-  outline: none !important;
-  box-shadow: none !important;
-}
-
+.pf-v5-c-input-group .pf-v5-c-form-control,
 .pf-v5-c-input-group .pf-v5-c-form-control:focus,
 .pf-v5-c-input-group .pf-v5-c-form-control:focus-visible,
 .pf-v5-c-input-group .pf-v5-c-form-control:focus-within {
   border: 0 !important;
+  border-radius: 0;
   outline: none !important;
   box-shadow: none !important;
 }
 
-/* Bouton permettant d’afficher le mot de passe */
-
 .pf-v5-c-button.pf-m-control {
   min-width: 48px;
-  color: #625a7c;
+  color: #7d6958;
   border: 0 !important;
   border-left: 1px solid var(--lbp-border) !important;
   border-radius: 0;
   outline: none !important;
-  background: #f7f4fb;
+  background: #fff8ed;
   box-shadow: none !important;
 }
 
@@ -312,14 +307,14 @@ input.pf-v5-c-form-control:focus-visible {
 }
 
 input[type="checkbox"] {
-  accent-color: var(--lbp-primary);
+  accent-color: var(--lbp-pulpe-dark);
 }
 
 /* Boutons */
 
 .pf-v5-c-button {
   font-family: inherit;
-  font-weight: 800;
+  font-weight: 850;
   transition:
     transform 150ms ease,
     background-color 150ms ease,
@@ -327,42 +322,41 @@ input[type="checkbox"] {
 }
 
 .pf-v5-c-button.pf-m-primary {
-  min-height: 49px;
+  min-height: 50px;
   color: white;
   border-radius: 12px;
-  background: var(--lbp-primary);
-  box-shadow: 0 13px 28px rgba(101, 85, 166, 0.22);
-  --pf-v5-c-button--m-primary--BackgroundColor: var(--lbp-primary);
-  --pf-v5-c-button--m-primary--hover--BackgroundColor:
-    var(--lbp-primary-hover);
+  background: var(--lbp-pulpe);
+  box-shadow: 0 13px 27px rgba(217, 113, 2, 0.2);
+  --pf-v5-c-button--m-primary--BackgroundColor: var(--lbp-pulpe);
+  --pf-v5-c-button--m-primary--hover--BackgroundColor: var(--lbp-pulpe-dark);
 }
 
 .pf-v5-c-button.pf-m-primary:hover {
-  background: var(--lbp-primary-hover);
-  box-shadow: 0 15px 32px rgba(101, 85, 166, 0.3);
+  background: var(--lbp-pulpe-dark);
+  box-shadow: 0 15px 30px rgba(217, 113, 2, 0.26);
   transform: translateY(-1px);
 }
 
 .pf-v5-c-button.pf-m-secondary,
 .pf-v5-c-button.pf-m-tertiary {
   min-height: 47px;
-  color: var(--lbp-primary);
+  color: #8d500c;
   border-radius: 12px;
   background: white;
 }
 
-/* Liens */
+/* Liens et zone d'inscription */
 
 a,
 .pf-v5-c-button.pf-m-link {
-  color: var(--lbp-primary);
-  font-weight: 750;
+  color: #c76600;
+  font-weight: 800;
   text-decoration: none;
 }
 
 a:hover,
 .pf-v5-c-button.pf-m-link:hover {
-  color: var(--lbp-primary-hover);
+  color: var(--lbp-pulpe-dark);
   text-decoration: underline;
 }
 
@@ -374,12 +368,17 @@ a:hover,
 #kc-registration,
 #kc-info {
   color: var(--lbp-muted);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.55;
   text-align: center;
 }
 
-/* Messages */
+#kc-registration a {
+  display: inline-block;
+  margin-left: 3px;
+}
+
+/* Messages et erreurs */
 
 .pf-v5-c-alert {
   border-radius: 12px;
@@ -395,8 +394,6 @@ a:hover,
   font-size: 12px;
 }
 
-/* Séparation des connexions externes */
-
 .kc-social-providers-divider {
   color: var(--lbp-muted);
   font-size: 12px;
@@ -410,18 +407,18 @@ a:hover,
 
 @media (max-width: 600px) {
   .pf-v5-c-login__container {
-    width: min(100% - 20px, 480px);
+    width: min(100% - 20px, 470px);
     padding: 24px 0;
   }
 
   #kc-header-wrapper {
-    font-size: 22px;
+    font-size: 21px;
   }
 
   #kc-header-wrapper::before {
-    width: 46px;
-    height: 46px;
-    border-radius: 14px;
+    width: 53px;
+    height: 53px;
+    border-radius: 15px;
   }
 
   .pf-v5-c-login__main {
@@ -443,9 +440,23 @@ a:hover,
   #kc-page-title {
     font-size: 24px;
   }
+
+  body#keycloak-bg::before {
+    top: 3%;
+    right: -80px;
+    width: 190px;
+    height: 190px;
+  }
+
+  body#keycloak-bg::after {
+    bottom: 2%;
+    left: -80px;
+    width: 170px;
+    height: 170px;
+  }
 }
 
-/* Suppression définitive du rectangle noir natif */
+/* Neutralise les doubles bordures générées par PatternFly. */
 
 #kc-form-login input#username,
 #kc-form-login input#password,
@@ -453,13 +464,11 @@ a:hover,
 #kc-reset-password-form input {
   width: 100% !important;
   height: 100% !important;
-  min-height: 46px !important;
+  min-height: 47px !important;
   margin: 0 !important;
   padding: 0 15px !important;
-
   appearance: none !important;
   -webkit-appearance: none !important;
-
   border: none !important;
   outline: none !important;
   background: transparent !important;
@@ -478,20 +487,20 @@ a:hover,
 #kc-reset-password-form input:focus-visible {
   appearance: none !important;
   -webkit-appearance: none !important;
-
   border: none !important;
   outline: none !important;
   box-shadow: none !important;
 }
 
-/* Cas particulier du remplissage automatique Chrome/Edge */
-
 #kc-form-login input:-webkit-autofill,
 #kc-form-login input:-webkit-autofill:hover,
-#kc-form-login input:-webkit-autofill:focus {
+#kc-form-login input:-webkit-autofill:focus,
+#kc-register-form input:-webkit-autofill,
+#kc-register-form input:-webkit-autofill:hover,
+#kc-register-form input:-webkit-autofill:focus {
   border: none !important;
   outline: none !important;
   -webkit-text-fill-color: var(--lbp-text) !important;
-  -webkit-box-shadow: 0 0 0 1000px #fdfcff inset !important;
-  box-shadow: 0 0 0 1000px #fdfcff inset !important;
+  -webkit-box-shadow: 0 0 0 1000px #fffdfa inset !important;
+  box-shadow: 0 0 0 1000px #fffdfa inset !important;
 }
