@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 
 import keycloak from './auth/keycloak'
+import FeatherIcon from './components/FeatherIcon.vue'
 
 type RedirectAction = 'login' | 'register'
 
@@ -106,7 +107,7 @@ function register() {
         </p>
 
         <div class="trust-line">
-          <span class="trust-icon">✓</span>
+          <span class="trust-icon"><FeatherIcon name="shield" :size="13" /></span>
 
           <span> Connexion sécurisée et mots de passe protégés par Keycloak </span>
         </div>
@@ -133,23 +134,17 @@ function register() {
               <span>Origine grecque</span>
             </div>
 
-            <span class="heart">♡</span>
+            <span class="heart"><FeatherIcon name="heart" :size="24" /></span>
           </div>
 
           <div class="choice-buttons">
-            <span>Passer</span>
-            <strong>J’aime</strong>
+            <span><FeatherIcon name="x" :size="16" />Je n’aime pas</span>
+            <strong><FeatherIcon name="heart" :size="16" />J’aime</strong>
           </div>
-
-          <div class="progress">
-            <span></span>
-          </div>
-
-          <small>12 prénoms découverts sur 40</small>
         </article>
 
         <article class="preview-card match-card">
-          <span class="match-icon">♥</span>
+          <span class="match-icon"><FeatherIcon name="heart" :size="20" /></span>
 
           <div>
             <small>Un prénom en commun !</small>
@@ -163,7 +158,7 @@ function register() {
           <div class="participants">
             <span>V</span>
             <span>L</span>
-            <span class="participant-check">✓</span>
+            <span class="participant-check"><FeatherIcon name="check" :size="14" /></span>
           </div>
         </article>
       </div>
@@ -508,7 +503,7 @@ button:disabled {
 }
 
 .name-card strong,
-.name-card span {
+.name-card > div > span {
   display: block;
 }
 
@@ -517,7 +512,7 @@ button:disabled {
   font-size: 18px;
 }
 
-.name-card span {
+.name-card > div > span {
   margin-top: 4px;
   color: #8a8497;
   font-size: 11px;
@@ -535,47 +530,25 @@ button:disabled {
   margin-top: 16px;
 }
 
-.choice-buttons span,
-.choice-buttons strong {
-  display: grid;
+.choice-buttons > span,
+.choice-buttons > strong {
+  display: flex;
   min-height: 45px;
-  place-items: center;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   border-radius: 12px;
   font-size: 12px;
 }
 
-.choice-buttons span {
+.choice-buttons > span {
   color: #777286;
   background: #f3f1f6;
 }
 
-.choice-buttons strong {
+.choice-buttons > strong {
   color: white;
   background: #cf7187;
-}
-
-.progress {
-  height: 6px;
-  margin-top: 25px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: #eeebf3;
-}
-
-.progress span {
-  display: block;
-  width: 38%;
-  height: 100%;
-  border-radius: inherit;
-  background: #7465b7;
-}
-
-.main-card > small {
-  display: block;
-  margin-top: 9px;
-  color: #9791a2;
-  font-size: 10px;
-  text-align: right;
 }
 
 .match-card {
@@ -641,7 +614,7 @@ button:disabled {
   margin-top: 9px;
 }
 
-.participants span {
+.participants > span {
   display: grid;
   width: 33px;
   height: 33px;
@@ -655,12 +628,12 @@ button:disabled {
   font-weight: 900;
 }
 
-.participants span:first-child {
+.participants > span:first-child {
   margin-left: 0;
   background: #cf7187;
 }
 
-.participants .participant-check {
+.participants > .participant-check {
   color: #347454;
   background: #def2e5;
 }

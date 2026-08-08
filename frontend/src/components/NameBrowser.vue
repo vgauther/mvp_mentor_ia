@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 import { authenticatedFetch, getErrorMessage } from '../api/client'
 import type { FirstName, NameDecisionChoice, NameSearch } from '../types/api'
+import FeatherIcon from './FeatherIcon.vue'
 import SearchFiltersPanel from './SearchFiltersPanel.vue'
 
 const props = defineProps<{
@@ -181,7 +182,7 @@ onBeforeUnmount(() => {
         data-test="open-quick-filters"
         @click="openFilters"
       >
-        <span aria-hidden="true">☰</span>
+        <FeatherIcon name="sliders" :size="16" />
         Filtres
         <strong v-if="activeFilterCount > 0">{{ activeFilterCount }}</strong>
       </button>
@@ -195,7 +196,7 @@ onBeforeUnmount(() => {
         role="status"
         aria-live="polite"
       >
-        <span class="match-notification-icon" aria-hidden="true">♥</span>
+        <span class="match-notification-icon"><FeatherIcon name="heart" :size="21" /></span>
 
         <span>
           <strong>C’est un match !</strong>
@@ -222,18 +223,21 @@ onBeforeUnmount(() => {
     </div>
 
     <div v-else-if="errorMessage && !firstName" class="state-card error-state">
-      <span class="state-symbol">!</span>
+      <span class="state-symbol"><FeatherIcon name="alert-circle" :size="21" /></span>
 
       <div>
         <strong>Le prénom n’a pas pu être chargé</strong>
         <p>Tu peux réessayer sans perdre les choix déjà enregistrés.</p>
 
-        <button type="button" class="retry-button" @click="loadNextFirstName">Réessayer</button>
+        <button type="button" class="retry-button" @click="loadNextFirstName">
+          <FeatherIcon name="rotate-ccw" :size="15" />
+          Réessayer
+        </button>
       </div>
     </div>
 
     <div v-else-if="isFinished" class="finished-card">
-      <span class="finished-icon">✓</span>
+      <span class="finished-icon"><FeatherIcon name="check" :size="31" stroke-width="2.5" /></span>
       <h3>Tu as parcouru tous les prénoms disponibles</h3>
 
       <p>
@@ -247,12 +251,13 @@ onBeforeUnmount(() => {
         data-test="back-to-searches"
         @click="emit('back')"
       >
+        <FeatherIcon name="arrow-left" :size="16" />
         Revenir aux recherches
       </button>
     </div>
 
     <article v-else-if="firstName" class="name-card">
-      <div class="name-decoration" aria-hidden="true">♡</div>
+      <div class="name-decoration"><FeatherIcon name="heart" :size="24" /></div>
 
       <div class="name-content">
         <span class="gender-badge">{{ firstName.gender_label }}</span>
@@ -278,12 +283,12 @@ onBeforeUnmount(() => {
           :disabled="isSubmitting"
           @click="choose('rejected')"
         >
-          <span>×</span>
+          <FeatherIcon name="x" :size="20" stroke-width="2.4" />
           Je n’aime pas
         </button>
 
         <button type="button" class="like-button" :disabled="isSubmitting" @click="choose('liked')">
-          <span>♥</span>
+          <FeatherIcon name="heart" :size="19" stroke-width="2.4" />
           J’aime
         </button>
       </div>
@@ -325,9 +330,8 @@ onBeforeUnmount(() => {
   box-shadow: 0 8px 20px rgba(91, 59, 29, 0.07);
 }
 
-.filters-button > span {
+.filters-button .feather-icon {
   color: #e68822;
-  font-size: 0.95rem;
 }
 
 .filters-button strong {
@@ -482,6 +486,10 @@ onBeforeUnmount(() => {
 
 .retry-button,
 .finish-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   margin-top: 16px;
   padding: 10px 15px;
   color: #ffffff;
@@ -609,8 +617,9 @@ dd {
 .decision-actions button {
   display: flex;
   min-height: 55px;
+  align-items: center;
+  justify-content: center;
   gap: 8px;
-  place-items: center;
   padding: 10px;
   border-radius: 15px;
   cursor: pointer;
@@ -629,11 +638,6 @@ dd {
 .decision-actions button:disabled {
   cursor: wait;
   opacity: 0.58;
-}
-
-.decision-actions button span {
-  font-size: 1.2rem;
-  line-height: 1;
 }
 
 .reject-button {

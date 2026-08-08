@@ -3,6 +3,7 @@ import { ref, watch } from 'vue'
 
 import { authenticatedFetch, getErrorMessage } from '../api/client'
 import type { CurrentProfile, ProfileLookup } from '../types/api'
+import FeatherIcon from './FeatherIcon.vue'
 
 const props = defineProps<{
   user: CurrentProfile
@@ -140,6 +141,7 @@ function formatDate(value: string) {
         </p>
 
         <button type="submit" class="primary-button" :disabled="isSaving">
+          <FeatherIcon name="save" :size="16" />
           {{ isSaving ? 'Enregistrement…' : 'Enregistrer le nom' }}
         </button>
       </form>
@@ -194,6 +196,7 @@ function formatDate(value: string) {
           </div>
 
           <button type="submit" class="secondary-button" :disabled="isSearching">
+            <FeatherIcon name="search" :size="16" />
             {{ isSearching ? 'Recherche…' : 'Rechercher' }}
           </button>
         </form>
@@ -213,7 +216,9 @@ function formatDate(value: string) {
             <p>{{ foundProfile.email }} · @{{ foundProfile.username }}</p>
           </div>
 
-          <span class="result-check" aria-label="Utilisateur trouvé">✓</span>
+          <span class="result-check" aria-label="Utilisateur trouvé">
+            <FeatherIcon name="check" :size="16" stroke-width="2.5" />
+          </span>
         </article>
       </div>
     </details>
@@ -437,6 +442,10 @@ input:focus {
 
 .primary-button,
 .secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   padding: 12px 18px;
   border: 0;
   border-radius: 12px;

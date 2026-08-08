@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 
 import { authenticatedFetch, getErrorMessage } from '../api/client'
 import type { FirstNameOrigin, NameSearch, SearchGender, SearchStatus } from '../types/api'
+import FeatherIcon from './FeatherIcon.vue'
 
 const props = defineProps<{
   userId: number
@@ -277,7 +278,7 @@ onMounted(() => {
           data-test="create-search-button"
           @click="openCreateForm"
         >
-          <span>+</span>
+          <FeatherIcon name="plus" :size="18" stroke-width="2.4" />
           Nouvelle recherche
         </button>
       </div>
@@ -295,16 +296,19 @@ onMounted(() => {
       </div>
 
       <div v-else-if="loadError" class="panel-state error-state">
-        <span class="state-symbol">!</span>
+        <span class="state-symbol"><FeatherIcon name="alert-circle" :size="21" /></span>
         <div>
           <strong>Impossible de charger les recherches</strong>
           <p role="alert">{{ loadError }}</p>
-          <button type="button" class="retry-button" @click="loadSearches">Réessayer</button>
+          <button type="button" class="retry-button" @click="loadSearches">
+            <FeatherIcon name="rotate-ccw" :size="15" />
+            Réessayer
+          </button>
         </div>
       </div>
 
       <div v-else-if="filteredSearches.length === 0" class="empty-state">
-        <span class="empty-heart">♡</span>
+        <span class="empty-heart"><FeatherIcon name="heart" :size="30" /></span>
 
         <h3>
           {{
@@ -326,6 +330,7 @@ onMounted(() => {
           class="empty-button"
           @click="openCreateForm"
         >
+          <FeatherIcon name="plus" :size="17" />
           Créer ma première recherche
         </button>
       </div>
@@ -372,6 +377,7 @@ onMounted(() => {
                 data-test="open-search-details-button"
                 @click="emit('openSearchDetails', search)"
               >
+                <FeatherIcon name="settings" :size="15" />
                 {{ search.status === 'active' ? 'Gérer' : 'Consulter' }}
               </button>
 
@@ -382,7 +388,7 @@ onMounted(() => {
                 @click="emit('openSearch', search)"
               >
                 Continuer
-                <span>→</span>
+                <FeatherIcon name="arrow-right" :size="15" />
               </button>
             </div>
           </footer>
@@ -393,7 +399,7 @@ onMounted(() => {
     <div v-if="isCreateOpen" class="modal-backdrop" @click.self="closeCreateForm">
       <section class="create-modal" role="dialog" aria-modal="true" aria-labelledby="create-title">
         <button type="button" class="close-button" aria-label="Fermer" @click="closeCreateForm">
-          ×
+          <FeatherIcon name="x" :size="19" />
         </button>
 
         <h2 id="create-title">Nouvelle recherche</h2>
@@ -523,6 +529,7 @@ onMounted(() => {
             </button>
 
             <button type="submit" class="confirm-button" :disabled="isCreating">
+              <FeatherIcon name="check" :size="16" />
               {{ isCreating ? 'Création…' : 'Créer la recherche' }}
             </button>
           </div>
@@ -663,11 +670,6 @@ onMounted(() => {
   font-weight: 850;
 }
 
-.create-button span {
-  font-size: 20px;
-  line-height: 0;
-}
-
 .status-filters {
   display: flex;
   gap: 7px;
@@ -762,6 +764,9 @@ onMounted(() => {
 }
 
 .retry-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   margin-top: 12px;
   padding: 9px 13px;
   color: #8b4d0d;
@@ -1056,7 +1061,6 @@ onMounted(() => {
   border-radius: 10px;
   background: #f3ede6;
   cursor: pointer;
-  font-size: 22px;
 }
 
 .modal-icon {

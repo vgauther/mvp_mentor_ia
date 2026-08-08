@@ -12,6 +12,7 @@ import type {
   SearchGender,
   SearchStatus,
 } from '../types/api'
+import FeatherIcon from './FeatherIcon.vue'
 import NameBrowser from './NameBrowser.vue'
 
 const props = withDefaults(
@@ -808,7 +809,7 @@ onMounted(() => {
           data-test="back-to-searches"
           @click="emit('back')"
         >
-          <span>←</span>
+          <FeatherIcon name="arrow-left" :size="16" />
           Recherches
         </button>
 
@@ -831,6 +832,7 @@ onMounted(() => {
           data-test="workspace-browser"
           @click="openNameBrowser"
         >
+          <FeatherIcon name="compass" :size="16" />
           Parcourir
         </button>
         <button
@@ -840,6 +842,7 @@ onMounted(() => {
           data-test="workspace-results"
           @click="openMatches"
         >
+          <FeatherIcon name="heart" :size="16" />
           Résultats
         </button>
         <button
@@ -849,6 +852,7 @@ onMounted(() => {
           data-test="workspace-participants"
           @click="openParticipants"
         >
+          <FeatherIcon name="users" :size="16" />
           Participants
         </button>
         <button
@@ -858,6 +862,7 @@ onMounted(() => {
           data-test="workspace-settings"
           @click="openSettings"
         >
+          <FeatherIcon name="settings" :size="16" />
           Paramètres
         </button>
       </nav>
@@ -900,12 +905,13 @@ onMounted(() => {
           data-test="refresh-liked-first-names"
           @click="loadLikedFirstNames"
         >
+          <FeatherIcon name="refresh-cw" :size="15" />
           {{ isLoadingLikedFirstNames ? 'Actualisation…' : 'Actualiser' }}
         </button>
       </div>
 
       <div v-if="isLoadingLikedFirstNames" class="matches-state" role="status">
-        <span class="loading-heart">♥</span>
+        <span class="loading-heart"><FeatherIcon name="heart" :size="23" /></span>
         <div>
           <strong>Chargement de tes prénoms aimés…</strong>
           <p>Nous récupérons les prénoms que tu as conservés pour cette recherche.</p>
@@ -913,16 +919,19 @@ onMounted(() => {
       </div>
 
       <div v-else-if="likedFirstNamesError" class="matches-state error-state" role="alert">
-        <span>!</span>
+        <span><FeatherIcon name="alert-circle" :size="22" /></span>
         <div>
           <strong>Les prénoms aimés n’ont pas pu être chargés</strong>
           <p>{{ likedFirstNamesError }}</p>
-          <button type="button" @click="loadLikedFirstNames">Réessayer</button>
+          <button type="button" @click="loadLikedFirstNames">
+            <FeatherIcon name="rotate-ccw" :size="15" />
+            Réessayer
+          </button>
         </div>
       </div>
 
       <div v-else-if="likedFirstNames.length === 0" class="matches-state empty-state">
-        <span>♡</span>
+        <span><FeatherIcon name="heart" :size="23" /></span>
         <div>
           <strong>Tu n’as encore aimé aucun prénom</strong>
           <p v-if="currentSearch.status === 'active'">
@@ -941,7 +950,7 @@ onMounted(() => {
         >
           <div class="match-card-heading">
             <span class="match-number">{{ String(index + 1).padStart(2, '0') }}</span>
-            <span class="match-heart">♥</span>
+            <span class="match-heart"><FeatherIcon name="heart" :size="17" /></span>
           </div>
 
           <h3>{{ firstName.name }}</h3>
@@ -988,12 +997,13 @@ onMounted(() => {
           data-test="refresh-search-matches"
           @click="loadMatches"
         >
+          <FeatherIcon name="refresh-cw" :size="15" />
           {{ isLoadingMatches ? 'Actualisation…' : 'Actualiser' }}
         </button>
       </div>
 
       <div v-if="isLoadingMatches" class="matches-state" role="status">
-        <span class="loading-heart">♥</span>
+        <span class="loading-heart"><FeatherIcon name="heart" :size="23" /></span>
         <div>
           <strong>Recherche des matchs…</strong>
           <p>Nous comparons les prénoms aimés par les deux participants.</p>
@@ -1001,16 +1011,19 @@ onMounted(() => {
       </div>
 
       <div v-else-if="matchesError" class="matches-state error-state" role="alert">
-        <span>!</span>
+        <span><FeatherIcon name="alert-circle" :size="22" /></span>
         <div>
           <strong>Les matchs n’ont pas pu être chargés</strong>
           <p>{{ matchesError }}</p>
-          <button type="button" @click="loadMatches">Réessayer</button>
+          <button type="button" @click="loadMatches">
+            <FeatherIcon name="rotate-ccw" :size="15" />
+            Réessayer
+          </button>
         </div>
       </div>
 
       <div v-else-if="matches.length === 0" class="matches-state empty-state">
-        <span>♡</span>
+        <span><FeatherIcon name="heart" :size="23" /></span>
         <div v-if="acceptedParticipants.length < 2">
           <strong>Le second participant n’a pas encore rejoint la recherche</strong>
           <p>
@@ -1031,7 +1044,7 @@ onMounted(() => {
         <article v-for="(firstName, index) in matches" :key="firstName.id" class="match-card">
           <div class="match-card-heading">
             <span class="match-number">{{ String(index + 1).padStart(2, '0') }}</span>
-            <span class="match-heart">♥</span>
+            <span class="match-heart"><FeatherIcon name="heart" :size="17" /></span>
           </div>
 
           <h3>{{ firstName.name }}</h3>
@@ -1108,6 +1121,7 @@ onMounted(() => {
             data-test="edit-search-button"
             @click="openSearchEditor"
           >
+            <FeatherIcon name="edit-3" :size="15" />
             Modifier la recherche
           </button>
         </div>
@@ -1247,6 +1261,7 @@ onMounted(() => {
               :disabled="isSavingSearch"
               data-test="save-search-details"
             >
+              <FeatherIcon name="save" :size="16" />
               {{ isSavingSearch ? 'Enregistrement…' : 'Enregistrer les modifications' }}
             </button>
           </div>
@@ -1291,6 +1306,7 @@ onMounted(() => {
                   :disabled="participantBeingRemovedId !== null"
                   @click="requestParticipantRemoval(participant)"
                 >
+                  <FeatherIcon name="user-x" :size="15" />
                   {{ participantBeingRemovedId === participant.id ? 'Retrait…' : 'Retirer' }}
                 </button>
               </div>
@@ -1316,6 +1332,7 @@ onMounted(() => {
                   :disabled="participantBeingRemovedId !== null"
                   @click="requestParticipantRemoval(participant)"
                 >
+                  <FeatherIcon name="x-circle" :size="15" />
                   {{
                     participantBeingRemovedId === participant.id
                       ? 'Annulation…'
@@ -1329,7 +1346,7 @@ onMounted(() => {
               v-if="acceptedParticipants.length === 1 && pendingParticipants.length === 0"
               class="empty-slot"
             >
-              <span>+</span>
+              <span><FeatherIcon name="user-plus" :size="20" /></span>
               <div>
                 <strong>Aucun second participant</strong>
                 <p v-if="isOwner && currentSearch.status === 'active'">
@@ -1383,6 +1400,7 @@ onMounted(() => {
                   class="lookup-button"
                   :disabled="isSearchingProfile || isSendingInvitation"
                 >
+                  <FeatherIcon name="search" :size="15" />
                   {{ isSearchingProfile ? 'Recherche…' : 'Rechercher' }}
                 </button>
               </div>
@@ -1415,6 +1433,7 @@ onMounted(() => {
                 :disabled="isSendingInvitation"
                 @click="sendInvitation"
               >
+                <FeatherIcon name="send" :size="15" />
                 {{ isSendingInvitation ? 'Envoi…' : 'Envoyer l’invitation' }}
               </button>
             </article>
@@ -1428,6 +1447,7 @@ onMounted(() => {
               :disabled="isLeavingSearch"
               @click="requestLeaveSearch"
             >
+              <FeatherIcon name="log-out" :size="15" />
               {{ isLeavingSearch ? 'Départ…' : 'Quitter la recherche' }}
             </button>
             <small>Tes décisions dans cette recherche seront supprimées.</small>
@@ -1453,6 +1473,7 @@ onMounted(() => {
                 :disabled="isUpdatingStatus"
                 @click="updateStatus('completed')"
               >
+                <FeatherIcon name="check-circle" :size="16" />
                 {{ isUpdatingStatus ? 'Modification…' : 'Terminer la recherche' }}
               </button>
               <small
@@ -1469,6 +1490,7 @@ onMounted(() => {
                 :disabled="isUpdatingStatus"
                 @click="updateStatus('active')"
               >
+                <FeatherIcon name="rotate-ccw" :size="16" />
                 Réactiver la recherche
               </button>
               <button
@@ -1478,6 +1500,7 @@ onMounted(() => {
                 :disabled="isUpdatingStatus"
                 @click="updateStatus('archived')"
               >
+                <FeatherIcon name="archive" :size="16" />
                 Archiver la recherche
               </button>
             </div>
@@ -1490,6 +1513,7 @@ onMounted(() => {
                 :disabled="isUpdatingStatus"
                 @click="updateStatus('completed')"
               >
+                <FeatherIcon name="rotate-ccw" :size="16" />
                 Restaurer la recherche
               </button>
               <small>La recherche repassera d’abord dans l’état « Terminée ».</small>
@@ -1497,7 +1521,7 @@ onMounted(() => {
           </template>
 
           <div v-else class="member-note">
-            <span>i</span>
+            <span><FeatherIcon name="info" :size="18" /></span>
             <p>Seul le propriétaire peut terminer, réactiver ou archiver cette recherche.</p>
           </div>
 
@@ -1526,10 +1550,10 @@ onMounted(() => {
           data-test="close-participant-confirmation"
           @click="closeParticipantConfirmation"
         >
-          ×
+          <FeatherIcon name="x" :size="19" />
         </button>
 
-        <span class="confirmation-icon" aria-hidden="true">!</span>
+        <span class="confirmation-icon"><FeatherIcon name="alert-triangle" :size="25" /></span>
         <span class="section-kicker">Confirmation</span>
         <h3 id="participant-confirmation-title">{{ participantConfirmationTitle }}</h3>
         <p id="participant-confirmation-message">{{ participantConfirmationMessage }}</p>
@@ -1608,7 +1632,11 @@ onMounted(() => {
 
 .workspace-navigation button,
 .results-navigation button {
+  display: inline-flex;
   min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   border: 0;
   border-radius: 9px;
   color: #7d6552;
@@ -1657,10 +1685,6 @@ onMounted(() => {
   cursor: pointer;
   font-size: 0.8rem;
   font-weight: 800;
-}
-
-.back-button span {
-  font-size: 1.15rem;
 }
 
 .hero-card,
@@ -1737,7 +1761,11 @@ onMounted(() => {
 
 .refresh-button,
 .matches-state button {
+  display: inline-flex;
   min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   padding: 0 16px;
   border: 1px solid #e1cdb9;
   border-radius: 11px;
@@ -2026,7 +2054,11 @@ onMounted(() => {
 }
 
 .edit-search-button {
+  display: inline-flex;
   min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   margin-top: 15px;
   padding: 0 14px;
   border: 1px solid #d9c2aa;
@@ -2222,7 +2254,11 @@ onMounted(() => {
 }
 
 .edit-search-actions button {
+  display: inline-flex;
   min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   padding: 0 17px;
   border-radius: 12px;
   cursor: pointer;
@@ -2357,7 +2393,11 @@ onMounted(() => {
 
 .lookup-button,
 .send-invitation-button {
+  display: inline-flex;
   min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   border: 0;
   border-radius: 11px;
   cursor: pointer;
@@ -2468,6 +2508,10 @@ onMounted(() => {
 
 .participant-remove-button,
 .leave-search-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   border: 1px solid #e8b9b2;
   border-radius: 10px;
   color: #9d4034;
@@ -2524,7 +2568,11 @@ onMounted(() => {
 }
 
 .action-stack button {
+  display: inline-flex;
   min-height: 45px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   border-radius: 13px;
   cursor: pointer;
   font-weight: 850;
@@ -2564,7 +2612,7 @@ onMounted(() => {
   background: #e9f7fb;
 }
 
-.member-note span {
+.member-note > span {
   display: grid;
   width: 24px;
   height: 24px;
@@ -2635,8 +2683,6 @@ onMounted(() => {
   color: #806c59;
   background: #f7efe5;
   cursor: pointer;
-  font-size: 1.35rem;
-  line-height: 1;
   place-items: center;
 }
 

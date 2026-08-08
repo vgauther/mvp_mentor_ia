@@ -3,6 +3,7 @@ import { onMounted, ref, watch } from 'vue'
 
 import { authenticatedFetch, getErrorMessage } from '../api/client'
 import type { FirstNameOrigin, NameSearch, SearchGender } from '../types/api'
+import FeatherIcon from './FeatherIcon.vue'
 
 const props = defineProps<{
   search: NameSearch
@@ -192,7 +193,7 @@ onMounted(() => {
         data-test="close-quick-filters"
         @click="emit('close')"
       >
-        ×
+        <FeatherIcon name="x" :size="19" />
       </button>
     </header>
 
@@ -296,6 +297,7 @@ onMounted(() => {
           data-test="reset-quick-filters"
           @click="resetOptionalFilters"
         >
+          <FeatherIcon name="rotate-ccw" :size="15" />
           Tout réinitialiser
         </button>
         <button
@@ -304,6 +306,7 @@ onMounted(() => {
           :disabled="isSaving || isLoadingOrigins"
           data-test="save-quick-filters"
         >
+          <FeatherIcon name="check" :size="16" />
           {{ isSaving ? 'Enregistrement…' : 'Appliquer les filtres' }}
         </button>
       </div>
@@ -332,7 +335,7 @@ onMounted(() => {
   border-bottom: 1px solid #f1e4d6;
 }
 
-.filters-heading span {
+.filters-heading > div > span {
   color: #eb8a20;
   font-size: 0.7rem;
   font-weight: 900;
@@ -365,7 +368,6 @@ onMounted(() => {
   color: #7d6552;
   background: #ffffff;
   cursor: pointer;
-  font-size: 1.4rem;
 }
 
 form {
@@ -501,7 +503,11 @@ legend {
 }
 
 .filter-actions button {
+  display: inline-flex;
   min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   padding: 0 16px;
   border-radius: 11px;
   cursor: pointer;

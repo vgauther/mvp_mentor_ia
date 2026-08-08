@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 
 import { authenticatedFetch, getErrorMessage } from '../api/client'
 import type { InvitationStatus, SearchInvitation } from '../types/api'
+import FeatherIcon from './FeatherIcon.vue'
 
 const invitations = ref<SearchInvitation[]>([])
 const isLoading = ref(true)
@@ -127,7 +128,7 @@ onMounted(() => {
           :disabled="isLoading || invitationBeingUpdated !== null"
           @click="loadInvitations"
         >
-          <span aria-hidden="true">↻</span>
+          <FeatherIcon name="refresh-cw" :size="15" />
           Actualiser
         </button>
       </div>
@@ -150,19 +151,20 @@ onMounted(() => {
       </div>
 
       <div v-else-if="loadError" class="panel-state error-state">
-        <span class="state-symbol">!</span>
+        <span class="state-symbol"><FeatherIcon name="alert-circle" :size="21" /></span>
 
         <div>
           <strong>Chargement impossible</strong>
           <p role="alert">{{ loadError }}</p>
           <button type="button" class="retry-button" @click="loadInvitations">
+            <FeatherIcon name="rotate-ccw" :size="15" />
             Réessayer
           </button>
         </div>
       </div>
 
       <div v-else-if="invitations.length === 0" class="empty-state">
-        <span class="empty-icon" aria-hidden="true">♡</span>
+        <span class="empty-icon"><FeatherIcon name="inbox" :size="27" /></span>
         <h3>Aucune invitation en attente</h3>
         <p>Les nouvelles invitations apparaîtront automatiquement dans cette rubrique.</p>
       </div>
@@ -198,6 +200,7 @@ onMounted(() => {
               :disabled="invitationBeingUpdated !== null"
               @click="respondToInvitation(invitation, 'declined')"
             >
+              <FeatherIcon name="x" :size="15" />
               {{ invitationBeingUpdated === invitation.id ? 'En cours…' : 'Refuser' }}
             </button>
 
@@ -207,6 +210,7 @@ onMounted(() => {
               :disabled="invitationBeingUpdated !== null"
               @click="respondToInvitation(invitation, 'accepted')"
             >
+              <FeatherIcon name="check" :size="15" />
               {{ invitationBeingUpdated === invitation.id ? 'En cours…' : 'Accepter' }}
             </button>
           </div>
@@ -275,10 +279,6 @@ onMounted(() => {
   border: 1px solid #f0d7b4;
   background: #fff9ef;
   font-size: 11px;
-}
-
-.refresh-button span {
-  font-size: 16px;
 }
 
 button:disabled {
@@ -362,6 +362,9 @@ button:not(:disabled):hover {
 }
 
 .retry-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   margin-top: 13px;
   padding: 9px 13px;
   color: #fff;
@@ -488,6 +491,10 @@ button:not(:disabled):hover {
 
 .accept-button,
 .decline-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   min-width: 88px;
   padding: 10px 13px;
   font-size: 11px;

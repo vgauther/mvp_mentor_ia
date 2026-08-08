@@ -4,6 +4,7 @@ import { computed, onMounted, ref } from "vue";
 import { authenticatedFetch } from "./api/client";
 import logoIconUrl from "./assets/brand/logo-icon.png";
 import keycloak from "./auth/keycloak";
+import FeatherIcon from "./components/FeatherIcon.vue";
 import InvitationsDashboard from "./components/InvitationsDashboard.vue";
 import ProfileSettings from "./components/ProfileSettings.vue";
 import SearchDashboard from "./components/SearchDashboard.vue";
@@ -158,7 +159,7 @@ onMounted(() => {
           data-test="searches-navigation"
           @click="showSearches"
         >
-          <span class="nav-icon">♡</span>
+          <span class="nav-icon"><FeatherIcon name="heart" :size="19" /></span>
           <span>Recherches</span>
         </button>
 
@@ -168,7 +169,7 @@ onMounted(() => {
           data-test="invitations-navigation"
           @click="showInvitations"
         >
-          <span class="nav-icon">✉</span>
+          <span class="nav-icon"><FeatherIcon name="mail" :size="19" /></span>
           <span>Invitations</span>
         </button>
 
@@ -178,7 +179,7 @@ onMounted(() => {
           data-test="profile-navigation"
           @click="showProfile"
         >
-          <span class="nav-icon">○</span>
+          <span class="nav-icon"><FeatherIcon name="user" :size="19" /></span>
           <span>Profil</span>
         </button>
       </nav>
@@ -193,7 +194,7 @@ onMounted(() => {
       </div>
 
       <button type="button" class="logout-button" @click="logout">
-        <span>↗</span>
+        <FeatherIcon name="log-out" :size="16" />
         Se déconnecter
       </button>
     </aside>
@@ -213,7 +214,7 @@ onMounted(() => {
             :class="{ active: activeSection === 'searches' }"
             @click="showSearches"
           >
-            ♡
+            <FeatherIcon name="heart" :size="19" />
           </button>
 
           <button
@@ -223,7 +224,7 @@ onMounted(() => {
             :class="{ active: activeSection === 'invitations' }"
             @click="showInvitations"
           >
-            ✉
+            <FeatherIcon name="mail" :size="19" />
           </button>
 
           <button
@@ -233,7 +234,7 @@ onMounted(() => {
             :class="{ active: activeSection === 'profile' }"
             @click="showProfile"
           >
-            ○
+            <FeatherIcon name="user" :size="19" />
           </button>
 
           <button
@@ -242,7 +243,7 @@ onMounted(() => {
             aria-label="Se déconnecter"
             @click="logout"
           >
-            ↗
+            <FeatherIcon name="log-out" :size="19" />
           </button>
         </div>
       </header>
@@ -257,12 +258,13 @@ onMounted(() => {
       </section>
 
       <section v-else-if="loadError" class="app-state error-state">
-        <span class="state-symbol">!</span>
+        <span class="state-symbol"><FeatherIcon name="alert-circle" :size="23" /></span>
 
         <div>
           <h1>Connexion impossible</h1>
           <p role="alert">{{ loadError }}</p>
           <button type="button" class="retry-button" @click="loadUser">
+            <FeatherIcon name="rotate-ccw" :size="16" />
             Réessayer
           </button>
         </div>
@@ -273,7 +275,7 @@ onMounted(() => {
           <div>
             <p>
               Bonjour {{ visibleName }}
-              <span aria-hidden="true">👋</span>
+              <FeatherIcon name="sun" :size="15" />
             </p>
 
             <h1>{{ pageTitle }}</h1>
@@ -512,6 +514,9 @@ nav button.active {
 }
 
 .page-heading p {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   margin: 0 0 5px;
   color: #a16f3e;
   font-size: 12px;
@@ -577,6 +582,9 @@ nav button.active {
 }
 
 .retry-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   margin-top: 16px;
   padding: 10px 15px;
   color: #fff;
