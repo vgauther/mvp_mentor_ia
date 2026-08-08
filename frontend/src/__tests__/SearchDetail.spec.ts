@@ -94,6 +94,42 @@ afterEach(() => {
 })
 
 describe('SearchDetail', () => {
+  it('organise le parcours, les résultats, les participants et les paramètres', async () => {
+    authenticatedFetchMock
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]))
+
+    const wrapper = mount(SearchDetail, {
+      props: {
+        search: activeSearch,
+        userId: 12,
+      },
+    })
+
+    expect(wrapper.get('[data-test="workspace-settings"]').classes()).toContain('active')
+    expect(wrapper.text()).toContain('Gestion de la recherche')
+
+    await wrapper.get('[data-test="workspace-results"]').trigger('click')
+    await flushPromises()
+
+    expect(authenticatedFetchMock).toHaveBeenNthCalledWith(1, '/api/searches/41/matches/')
+    expect(wrapper.text()).toContain('Les matchs de « Notre futur prénom »')
+
+    await wrapper.get('[data-test="show-liked-results"]').trigger('click')
+    await flushPromises()
+
+    expect(authenticatedFetchMock).toHaveBeenNthCalledWith(
+      2,
+      '/api/searches/41/liked-first-names/',
+    )
+    expect(wrapper.text()).toContain('Mes prénoms aimés dans « Notre futur prénom »')
+
+    await wrapper.get('[data-test="workspace-participants"]').trigger('click')
+
+    expect(wrapper.text()).toContain('Participants')
+    expect(wrapper.text()).not.toContain('Gestion de la recherche')
+  })
+
   it('permet au propriétaire de modifier les informations et les filtres', async () => {
     const updatedSearch: NameSearch = {
       ...activeSearch,
@@ -211,6 +247,7 @@ describe('SearchDetail', () => {
       },
     })
 
+    await wrapper.get('[data-test="workspace-participants"]').trigger('click')
     await wrapper.get('[data-test="remove-participant-92"]').trigger('click')
     expect(wrapper.get('[data-test="participant-confirmation"]').text()).toContain(
       'Retirer ce participant ?',
@@ -249,6 +286,7 @@ describe('SearchDetail', () => {
       },
     })
 
+    await wrapper.get('[data-test="workspace-participants"]').trigger('click')
     await wrapper.get('[data-test="cancel-invitation-93"]').trigger('click')
     expect(wrapper.get('[data-test="participant-confirmation"]').text()).toContain(
       'Annuler cette invitation ?',
@@ -283,6 +321,7 @@ describe('SearchDetail', () => {
       },
     })
 
+    await wrapper.get('[data-test="workspace-participants"]').trigger('click')
     await wrapper.get('[data-test="leave-search"]').trigger('click')
     expect(wrapper.get('[data-test="participant-confirmation"]').text()).toContain(
       'Quitter cette recherche ?',
@@ -309,6 +348,7 @@ describe('SearchDetail', () => {
       },
     })
 
+    await wrapper.get('[data-test="workspace-participants"]').trigger('click')
     await wrapper.get('[data-test="remove-participant-92"]').trigger('click')
     await wrapper.get('[data-test="cancel-participant-action"]').trigger('click')
     await flushPromises()

@@ -193,21 +193,20 @@ describe("App", () => {
     expect(wrapper.text()).toContain("Lina");
     expect(wrapper.text()).toContain("Je n’aime pas");
     expect(wrapper.text()).toContain("J’aime");
-    expect(wrapper.find('[data-test="browse-first-names"]').exists()).toBe(
-      false,
+    expect(wrapper.get('[data-test="workspace-browser"]').classes()).toContain(
+      "active",
     );
 
-    await wrapper
-      .get('[data-test="open-current-search-details"]')
-      .trigger("click");
+    await wrapper.get('[data-test="workspace-settings"]').trigger("click");
 
-    expect(wrapper.text()).toContain("Détail de ta recherche");
-    expect(wrapper.find('[data-test="browse-first-names"]').exists()).toBe(
-      true,
+    expect(wrapper.find(".page-heading").exists()).toBe(false);
+    expect(wrapper.text()).toContain("Gestion de la recherche");
+    expect(wrapper.get('[data-test="workspace-settings"]').classes()).toContain(
+      "active",
     );
     expect(fetchMock).toHaveBeenCalledTimes(3);
 
-    await wrapper.get('[data-test="browse-first-names"]').trigger("click");
+    await wrapper.get('[data-test="workspace-browser"]').trigger("click");
     await flushPromises();
 
     await wrapper.get('[data-test="back-to-searches"]').trigger("click");
@@ -223,9 +222,10 @@ describe("App", () => {
       .get('[data-test="open-search-details-button"]')
       .trigger("click");
 
-    expect(wrapper.text()).toContain("Détail de ta recherche");
-    expect(wrapper.find('[data-test="browse-first-names"]').exists()).toBe(
-      true,
+    expect(wrapper.find(".page-heading").exists()).toBe(false);
+    expect(wrapper.text()).toContain("Gestion de la recherche");
+    expect(wrapper.get('[data-test="workspace-settings"]').classes()).toContain(
+      "active",
     );
     expect(fetchMock).toHaveBeenCalledTimes(5);
   });
@@ -256,7 +256,7 @@ describe("App", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(wrapper.text()).toContain("La recherche est terminée.");
     expect(
-      wrapper.get('[data-test="browse-first-names"]').attributes("disabled"),
+      wrapper.get('[data-test="workspace-browser"]').attributes("disabled"),
     ).toBeDefined();
   });
 

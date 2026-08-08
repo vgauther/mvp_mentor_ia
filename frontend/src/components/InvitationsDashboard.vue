@@ -114,24 +114,12 @@ onMounted(() => {
 
 <template>
   <div class="invitations-content">
-    <section class="summary-card" aria-label="Résumé des invitations">
-      <span class="summary-icon">✉</span>
-
-      <div>
-        <strong>{{ invitationCount }}</strong>
-        <span>
-          Invitation{{ invitationCount > 1 ? 's' : '' }} en attente
-        </span>
-      </div>
-    </section>
-
     <section class="invitations-panel">
-      <div class="panel-heading">
-        <div>
-          <span class="section-kicker">Recherches partagées</span>
-          <h2>Mes invitations</h2>
-          <p>Accepte une invitation pour rejoindre une recherche de prénom à deux.</p>
-        </div>
+      <div class="invitations-toolbar">
+        <p>
+          <strong>{{ invitationCount }}</strong>
+          invitation{{ invitationCount > 1 ? 's' : '' }} en attente
+        </p>
 
         <button
           type="button"
@@ -231,67 +219,21 @@ onMounted(() => {
 <style scoped>
 .invitations-content {
   display: grid;
-  gap: 22px;
-}
-
-.summary-card {
-  display: flex;
-  width: min(330px, 100%);
-  align-items: center;
-  gap: 15px;
-  padding: 19px 21px;
-  border: 1px solid rgba(239, 153, 56, 0.16);
-  border-radius: 18px;
-  background: linear-gradient(145deg, #fff8ea, #fff1d6);
-  box-shadow: 0 16px 36px rgba(126, 83, 35, 0.07);
-}
-
-.summary-icon {
-  display: grid;
-  width: 46px;
-  height: 46px;
-  flex: 0 0 auto;
-  place-items: center;
-  color: #985711;
-  border-radius: 14px;
-  background: #ffd493;
-  font-size: 22px;
-  font-weight: 900;
-}
-
-.summary-card strong,
-.summary-card span {
-  display: block;
-}
-
-.summary-card strong {
-  color: #4a3422;
-  font-size: 25px;
-}
-
-.summary-card div > span {
-  margin-top: 2px;
-  color: #8e735d;
-  font-size: 12px;
-  font-weight: 750;
+  gap: 16px;
 }
 
 .invitations-panel {
-  padding: 27px;
-  border: 1px solid rgba(126, 83, 35, 0.11);
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow: 0 18px 48px rgba(90, 59, 29, 0.07);
+  padding: 0;
 }
 
-.panel-heading {
+.invitations-toolbar {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 22px;
+  gap: 16px;
+  margin-bottom: 16px;
 }
 
-.section-kicker,
 .invitation-label {
   color: #da7b14;
   font-size: 10px;
@@ -300,17 +242,15 @@ onMounted(() => {
   text-transform: uppercase;
 }
 
-.panel-heading h2 {
-  margin: 5px 0 6px;
-  color: #3f2e20;
-  font-size: 24px;
-  letter-spacing: -0.025em;
+.invitations-toolbar p {
+  margin: 0;
+  color: #806e5e;
+  font-size: 13px;
 }
 
-.panel-heading p {
-  margin: 0;
-  color: #8c7869;
-  font-size: 13px;
+.invitations-toolbar p strong {
+  color: #4a3421;
+  font-size: 16px;
 }
 
 .refresh-button,
@@ -465,19 +405,19 @@ button:not(:disabled):hover {
 
 .invitation-list {
   display: grid;
-  gap: 14px;
-  margin-top: 23px;
+  gap: 10px;
+  margin-top: 16px;
 }
 
 .invitation-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
-  padding: 20px;
+  gap: 20px;
+  padding: 18px;
   border: 1px solid #eadbc9;
-  border-radius: 17px;
-  background: #fffdf9;
+  border-radius: 16px;
+  background: #ffffff;
 }
 
 .invitation-main {
@@ -573,13 +513,9 @@ button:not(:disabled):hover {
 }
 
 @media (max-width: 760px) {
-  .invitations-panel {
-    padding: 20px;
-  }
-
-  .panel-heading,
+  .invitations-toolbar,
   .invitation-card {
-    align-items: stretch;
+    align-items: flex-start;
     flex-direction: column;
   }
 
@@ -598,11 +534,6 @@ button:not(:disabled):hover {
 }
 
 @media (max-width: 480px) {
-  .invitations-panel {
-    padding: 16px;
-    border-radius: 17px;
-  }
-
   .invitation-card {
     padding: 16px;
   }

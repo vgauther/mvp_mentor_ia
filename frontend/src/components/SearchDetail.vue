@@ -67,6 +67,19 @@ const participantBeingRemovedId = ref<number | null>(null)
 const isLeavingSearch = ref(false)
 const participantActionError = ref('')
 const participantActionSuccess = ref('')
+const detailView = ref<'participants' | 'settings'>('settings')
+
+const workspaceView = computed<'browser' | 'results' | 'participants' | 'settings'>(() => {
+  if (isBrowsingFirstNames.value) {
+    return 'browser'
+  }
+
+  if (isViewingLikedFirstNames.value || isViewingMatches.value) {
+    return 'results'
+  }
+
+  return detailView.value
+})
 
 type ParticipantConfirmation =
   | {
@@ -205,6 +218,7 @@ watch(
       participantActionError.value = ''
       participantActionSuccess.value = ''
       participantConfirmation.value = null
+      detailView.value = 'settings'
       resetInvitationForm()
     }
 
@@ -225,8 +239,19 @@ function openNameBrowser() {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
-function closeNameBrowser() {
+function openParticipants() {
   isBrowsingFirstNames.value = false
+  isViewingLikedFirstNames.value = false
+  isViewingMatches.value = false
+  detailView.value = 'participants'
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+function openSettings() {
+  isBrowsingFirstNames.value = false
+  isViewingLikedFirstNames.value = false
+  isViewingMatches.value = false
+  detailView.value = 'settings'
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
@@ -269,11 +294,6 @@ async function openLikedFirstNames() {
   await loadLikedFirstNames()
 }
 
-function closeLikedFirstNames() {
-  isViewingLikedFirstNames.value = false
-  window.scrollTo({ top: 0, behavior: 'smooth' })
-}
-
 async function loadMatches() {
   isLoadingMatches.value = true
   matchesError.value = ''
@@ -304,11 +324,6 @@ async function openMatches() {
   isViewingMatches.value = true
   window.scrollTo({ top: 0, behavior: 'smooth' })
   await loadMatches()
-}
-
-function closeMatches() {
-  isViewingMatches.value = false
-  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 function participantName(participant: NameSearchParticipant) {
@@ -785,33 +800,88 @@ onMounted(() => {
 
 <template>
   <div class="detail-content">
+    <header class="workspace-header">
+      <div class="workspace-topbar">
+        <button
+          type="button"
+          class="back-button"
+          data-test="back-to-searches"
+          @click="emit('back')"
+        >
+          <span>←</span>
+          Recherches
+        </button>
+
+        <div class="workspace-identity">
+          <strong>{{ currentSearch.title }}</strong>
+
+          <span :class="['status-badge', `status-${currentSearch.status}`]">
+            <span></span>
+            {{ currentSearch.status_label }}
+          </span>
+        </div>
+      </div>
+
+      <nav class="workspace-navigation" aria-label="Navigation de la recherche">
+        <button
+          type="button"
+          :class="{ active: workspaceView === 'browser' }"
+          :disabled="currentSearch.status !== 'active'"
+          :aria-current="workspaceView === 'browser' ? 'page' : undefined"
+          data-test="workspace-browser"
+          @click="openNameBrowser"
+        >
+          Parcourir
+        </button>
+        <button
+          type="button"
+          :class="{ active: workspaceView === 'results' }"
+          :aria-current="workspaceView === 'results' ? 'page' : undefined"
+          data-test="workspace-results"
+          @click="openMatches"
+        >
+          Résultats
+        </button>
+        <button
+          type="button"
+          :class="{ active: workspaceView === 'participants' }"
+          :aria-current="workspaceView === 'participants' ? 'page' : undefined"
+          data-test="workspace-participants"
+          @click="openParticipants"
+        >
+          Participants
+        </button>
+        <button
+          type="button"
+          :class="{ active: workspaceView === 'settings' }"
+          :aria-current="workspaceView === 'settings' ? 'page' : undefined"
+          data-test="workspace-settings"
+          @click="openSettings"
+        >
+          Paramètres
+        </button>
+      </nav>
+    </header>
+
     <NameBrowser
       v-if="isBrowsingFirstNames"
       :search="currentSearch"
       :can-edit-filters="isOwner"
       @back="emit('back')"
-      @details="closeNameBrowser"
       @search-updated="handleBrowserSearchUpdated"
     />
 
     <section v-else-if="isViewingLikedFirstNames" class="matches-view">
-      <button
-        type="button"
-        class="back-button"
-        data-test="back-to-search-detail"
-        @click="closeLikedFirstNames"
-      >
-        <span>←</span>
-        Retour à la recherche
-      </button>
+      <div class="results-navigation" aria-label="Type de résultats">
+        <button type="button" class="active" aria-current="page">Mes prénoms aimés</button>
+        <button type="button" data-test="show-matches-results" @click="openMatches">
+          Nos matchs
+        </button>
+      </div>
 
       <section class="matches-hero">
         <div>
-          <p class="eyebrow">Ma sélection</p>
           <h2>Mes prénoms aimés dans « {{ currentSearch.title }} »</h2>
-          <p>
-            Retrouve ici tous les prénoms que tu as aimés pendant ton parcours dans cette recherche.
-          </p>
         </div>
 
         <div class="match-total" aria-live="polite">
@@ -823,10 +893,6 @@ onMounted(() => {
       </section>
 
       <div class="matches-toolbar">
-        <div>
-          <span class="section-kicker">Sélection personnelle</span>
-          <h3>Les prénoms que tu as conservés</h3>
-        </div>
         <button
           type="button"
           class="refresh-button"
@@ -896,24 +962,16 @@ onMounted(() => {
     </section>
 
     <section v-else-if="isViewingMatches" class="matches-view">
-      <button
-        type="button"
-        class="back-button"
-        data-test="back-to-search-detail"
-        @click="closeMatches"
-      >
-        <span>←</span>
-        Retour à la recherche
-      </button>
+      <div class="results-navigation" aria-label="Type de résultats">
+        <button type="button" data-test="show-liked-results" @click="openLikedFirstNames">
+          Mes prénoms aimés
+        </button>
+        <button type="button" class="active" aria-current="page">Nos matchs</button>
+      </div>
 
       <section class="matches-hero">
         <div>
-          <p class="eyebrow">Résultats communs</p>
           <h2>Les matchs de « {{ currentSearch.title }} »</h2>
-          <p>
-            Retrouve ici les prénoms aimés par les deux participants. La liste évolue au fur et à
-            mesure de vos décisions.
-          </p>
         </div>
 
         <div class="match-total" aria-live="polite">
@@ -923,10 +981,6 @@ onMounted(() => {
       </section>
 
       <div class="matches-toolbar">
-        <div>
-          <span class="section-kicker">Sélection commune</span>
-          <h3>Prénoms appréciés ensemble</h3>
-        </div>
         <button
           type="button"
           class="refresh-button"
@@ -998,12 +1052,7 @@ onMounted(() => {
     </section>
 
     <template v-else>
-      <button type="button" class="back-button" data-test="back-to-searches" @click="emit('back')">
-        <span>←</span>
-        Retour aux recherches
-      </button>
-
-      <section class="hero-card">
+      <section v-if="workspaceView === 'settings'" class="hero-card">
         <div class="hero-copy">
           <div class="badge-row">
             <span :class="['status-badge', `status-${currentSearch.status}`]">
@@ -1064,7 +1113,7 @@ onMounted(() => {
         </div>
       </section>
 
-      <section v-if="isEditingSearch" class="panel edit-search-panel">
+      <section v-if="workspaceView === 'settings' && isEditingSearch" class="panel edit-search-panel">
         <div class="panel-heading">
           <div>
             <span class="section-kicker">Informations</span>
@@ -1204,19 +1253,19 @@ onMounted(() => {
         </form>
       </section>
 
-      <p v-if="editSuccess" class="feedback success-feedback" role="status">
+      <p v-if="workspaceView === 'settings' && editSuccess" class="feedback success-feedback" role="status">
         {{ editSuccess }}
       </p>
 
-      <p v-if="statusSuccess" class="feedback success-feedback" role="status">
+      <p v-if="workspaceView === 'settings' && statusSuccess" class="feedback success-feedback" role="status">
         {{ statusSuccess }}
       </p>
-      <p v-if="statusError" class="feedback error-feedback" role="alert">
+      <p v-if="workspaceView === 'settings' && statusError" class="feedback error-feedback" role="alert">
         {{ statusError }}
       </p>
 
-      <div class="detail-grid">
-        <section class="panel participant-panel">
+      <div class="detail-grid single-section">
+        <section v-if="workspaceView === 'participants'" class="panel participant-panel">
           <div class="panel-heading">
             <div>
               <span class="section-kicker">Équipe</span>
@@ -1370,9 +1419,22 @@ onMounted(() => {
               </button>
             </article>
           </div>
+
+          <div v-if="!isOwner && currentParticipant" class="leave-search-area">
+            <button
+              type="button"
+              class="leave-search-button"
+              data-test="leave-search"
+              :disabled="isLeavingSearch"
+              @click="requestLeaveSearch"
+            >
+              {{ isLeavingSearch ? 'Départ…' : 'Quitter la recherche' }}
+            </button>
+            <small>Tes décisions dans cette recherche seront supprimées.</small>
+          </div>
         </section>
 
-        <section class="panel management-panel">
+        <section v-else class="panel management-panel">
           <div class="panel-heading">
             <div>
               <span class="section-kicker">Cycle de vie</span>
@@ -1439,67 +1501,8 @@ onMounted(() => {
             <p>Seul le propriétaire peut terminer, réactiver ou archiver cette recherche.</p>
           </div>
 
-          <div v-if="!isOwner && currentParticipant" class="leave-search-area">
-            <button
-              type="button"
-              class="leave-search-button"
-              data-test="leave-search"
-              :disabled="isLeavingSearch"
-              @click="requestLeaveSearch"
-            >
-              {{ isLeavingSearch ? 'Départ…' : 'Quitter la recherche' }}
-            </button>
-            <small>Tes décisions dans cette recherche seront supprimées.</small>
-          </div>
         </section>
       </div>
-
-      <section class="features-section">
-        <div class="section-heading">
-          <span class="section-kicker">Fonctionnalités</span>
-          <h3>Que veux-tu faire ?</h3>
-        </div>
-
-        <div class="feature-grid">
-          <article :class="{ unavailable: currentSearch.status !== 'active' }">
-            <span class="feature-icon orange">♡</span>
-            <div>
-              <h4>Parcourir les prénoms</h4>
-              <p>Aime ou refuse les propositions correspondant à cette recherche.</p>
-            </div>
-            <button
-              type="button"
-              :disabled="currentSearch.status !== 'active'"
-              data-test="browse-first-names"
-              @click="openNameBrowser"
-            >
-              {{ currentSearch.status === 'active' ? 'Commencer →' : 'Recherche inactive' }}
-            </button>
-          </article>
-
-          <article>
-            <span class="feature-icon blue">✓</span>
-            <div>
-              <h4>Prénoms aimés</h4>
-              <p>Retrouve les prénoms que tu as conservés pendant ton parcours.</p>
-            </div>
-            <button type="button" data-test="view-liked-first-names" @click="openLikedFirstNames">
-              Voir mes prénoms →
-            </button>
-          </article>
-
-          <article>
-            <span class="feature-icon yellow">♥</span>
-            <div>
-              <h4>Résultats et matchs</h4>
-              <p>Découvre les prénoms appréciés par tous les participants.</p>
-            </div>
-            <button type="button" data-test="view-search-matches" @click="openMatches">
-              Voir les matchs →
-            </button>
-          </article>
-        </div>
-      </section>
     </template>
 
     <div
@@ -1559,24 +1562,100 @@ onMounted(() => {
 <style scoped>
 .detail-content {
   display: grid;
-  gap: 20px;
+  gap: 14px;
+}
+
+.workspace-header {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(126, 83, 35, 0.1);
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 10px 28px rgba(119, 82, 38, 0.05);
+}
+
+.workspace-topbar {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 16px;
+}
+
+.workspace-identity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+}
+
+.workspace-identity strong {
+  overflow: hidden;
+  color: #4a3421;
+  font-size: 1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-navigation {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+  padding: 4px;
+  border-radius: 12px;
+  background: #f5efe8;
+}
+
+.workspace-navigation button,
+.results-navigation button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 9px;
+  color: #7d6552;
+  background: transparent;
+  cursor: pointer;
+  font-weight: 850;
+}
+
+.workspace-navigation button.active,
+.results-navigation button.active {
+  color: #8d591a;
+  background: #ffffff;
+  box-shadow: 0 5px 16px rgba(124, 80, 32, 0.09);
+}
+
+.workspace-navigation button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.results-navigation {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+  max-width: 520px;
+  padding: 4px;
+  border-radius: 12px;
+  background: #f5efe8;
 }
 
 .matches-view {
   display: grid;
-  gap: 20px;
+  gap: 12px;
 }
 
 .back-button {
   display: inline-flex;
   width: fit-content;
   align-items: center;
-  gap: 8px;
+  flex: 0 0 auto;
+  gap: 6px;
   padding: 0;
   border: 0;
   color: #7d6552;
   background: transparent;
   cursor: pointer;
+  font-size: 0.8rem;
   font-weight: 800;
 }
 
@@ -1591,26 +1670,24 @@ onMounted(() => {
 .matches-state,
 .match-card {
   border: 1px solid rgba(126, 83, 35, 0.1);
-  border-radius: 25px;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 18px 45px rgba(119, 82, 38, 0.07);
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 12px 32px rgba(119, 82, 38, 0.05);
 }
 
 .matches-hero {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 30px;
-  padding: 31px;
-  background:
-    radial-gradient(circle at 94% 12%, rgba(255, 218, 123, 0.45), transparent 14rem),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.97), rgba(255, 249, 239, 0.97));
+  gap: 18px;
+  padding: 18px 20px;
+  background: #ffffff;
 }
 
 .matches-hero h2 {
-  margin: 4px 0 12px;
+  margin: 0;
   color: #4a3421;
-  font-size: clamp(1.75rem, 4vw, 2.55rem);
+  font-size: clamp(1.25rem, 3vw, 1.65rem);
   line-height: 1.1;
 }
 
@@ -1622,23 +1699,25 @@ onMounted(() => {
 }
 
 .match-total {
-  display: grid;
-  min-width: 155px;
-  place-items: center;
-  padding: 23px 20px;
+  display: flex;
+  min-width: 126px;
+  align-items: baseline;
+  justify-content: center;
+  gap: 7px;
+  padding: 11px 14px;
   border: 1px solid rgba(185, 126, 33, 0.13);
-  border-radius: 20px;
+  border-radius: 12px;
   color: #87591c;
   background: rgba(255, 255, 255, 0.75);
 }
 
 .match-total strong {
-  font-size: 2.4rem;
+  font-size: 1.55rem;
   line-height: 1;
 }
 
 .match-total span {
-  margin-top: 7px;
+  margin-top: 0;
   font-size: 0.76rem;
   font-weight: 850;
 }
@@ -1646,7 +1725,7 @@ onMounted(() => {
 .matches-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 16px;
 }
 
@@ -1809,9 +1888,9 @@ onMounted(() => {
 .hero-card {
   display: flex;
   justify-content: space-between;
-  gap: 30px;
+  gap: 20px;
   overflow: hidden;
-  padding: 31px;
+  padding: 22px;
   background:
     radial-gradient(circle at 95% 5%, rgba(163, 223, 241, 0.45), transparent 15rem),
     linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(255, 249, 239, 0.96));
@@ -2176,6 +2255,10 @@ onMounted(() => {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(310px, 0.8fr);
   gap: 20px;
+}
+
+.detail-grid.single-section {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .panel,
@@ -2703,6 +2786,14 @@ onMounted(() => {
 }
 
 @media (max-width: 680px) {
+  .workspace-topbar {
+    align-items: flex-start;
+  }
+
+  .workspace-navigation {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .hero-card {
     display: grid;
     padding: 22px;
@@ -2766,6 +2857,20 @@ onMounted(() => {
 }
 
 @media (max-width: 520px) {
+  .workspace-topbar {
+    display: grid;
+    gap: 8px;
+  }
+
+  .workspace-identity {
+    justify-content: space-between;
+  }
+
+  .results-navigation {
+    grid-template-columns: 1fr;
+    max-width: none;
+  }
+
   .matches-toolbar,
   .matches-state {
     display: grid;

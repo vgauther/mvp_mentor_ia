@@ -47,18 +47,6 @@ const statusOptions: { value: SearchStatus | 'all'; label: string }[] = [
 
 const firstLetterOptions = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
-const activeCount = computed(
-  () => searches.value.filter((search) => search.status === 'active').length,
-)
-
-const completedCount = computed(
-  () => searches.value.filter((search) => search.status === 'completed').length,
-)
-
-const archivedCount = computed(
-  () => searches.value.filter((search) => search.status === 'archived').length,
-)
-
 const filteredSearches = computed(() => {
   if (selectedStatus.value === 'all') {
     return searches.value
@@ -66,6 +54,14 @@ const filteredSearches = computed(() => {
 
   return searches.value.filter((search) => search.status === selectedStatus.value)
 })
+
+function statusCount(status: SearchStatus | 'all') {
+  if (status === 'all') {
+    return searches.value.length
+  }
+
+  return searches.value.filter((search) => search.status === status).length
+}
 
 async function loadSearches() {
   isLoading.value = true
@@ -260,40 +256,19 @@ onMounted(() => {
 
 <template>
   <div class="dashboard-content">
-    <section class="summary-grid" aria-label="Résumé des recherches">
-      <article class="summary-card active-summary">
-        <span class="summary-icon">♥</span>
-        <div>
-          <strong>{{ activeCount }}</strong>
-          <span>
-            Recherche{{ activeCount > 1 ? 's' : '' }} active{{ activeCount > 1 ? 's' : '' }}
-          </span>
-        </div>
-      </article>
-
-      <article class="summary-card completed-summary">
-        <span class="summary-icon">✓</span>
-        <div>
-          <strong>{{ completedCount }}</strong>
-          <span>Terminée{{ completedCount > 1 ? 's' : '' }}</span>
-        </div>
-      </article>
-
-      <article class="summary-card archived-summary">
-        <span class="summary-icon">□</span>
-        <div>
-          <strong>{{ archivedCount }}</strong>
-          <span>Archivée{{ archivedCount > 1 ? 's' : '' }}</span>
-        </div>
-      </article>
-    </section>
-
     <section class="searches-panel">
-      <div class="panel-heading">
-        <div>
-          <span class="section-kicker">Mes projets</span>
-          <h2>Mes recherches de prénoms</h2>
-          <p>Retrouve ici tes recherches personnelles et celles partagées avec toi.</p>
+      <div class="searches-toolbar">
+        <div class="status-filters" aria-label="Filtrer les recherches">
+          <button
+            v-for="option in statusOptions"
+            :key="option.value"
+            type="button"
+            :class="{ selected: selectedStatus === option.value }"
+            @click="selectedStatus = option.value"
+          >
+            {{ option.label }}
+            <span>{{ statusCount(option.value) }}</span>
+          </button>
         </div>
 
         <button
@@ -310,18 +285,6 @@ onMounted(() => {
       <p v-if="createSuccess" class="feedback success-feedback" role="status">
         {{ createSuccess }}
       </p>
-
-      <div class="status-filters" aria-label="Filtrer les recherches">
-        <button
-          v-for="option in statusOptions"
-          :key="option.value"
-          type="button"
-          :class="{ selected: selectedStatus === option.value }"
-          @click="selectedStatus = option.value"
-        >
-          {{ option.label }}
-        </button>
-      </div>
 
       <div v-if="isLoading" class="panel-state" aria-live="polite">
         <span class="loader"></span>
@@ -374,51 +337,34 @@ onMounted(() => {
           class="search-card"
           data-test="search-card"
         >
-          <div class="card-topline">
-            <span :class="['status-badge', `status-${search.status}`]">
-              <span></span>
-              {{ search.status_label }}
-            </span>
+          <div class="search-card-main">
+            <div class="card-topline">
+              <span :class="['status-badge', `status-${search.status}`]">
+                <span></span>
+                {{ search.status_label }}
+              </span>
 
-            <span class="role-badge">
-              {{ currentRole(search) === 'owner' ? 'Ma recherche' : 'Partagée avec moi' }}
-            </span>
-          </div>
-
-          <h3>{{ search.title }}</h3>
-
-          <div class="gender-list" aria-label="Types de prénoms recherchés">
-            <span v-for="gender in search.genders" :key="gender">
-              {{ genderLabel(gender) }}
-            </span>
-          </div>
-
-          <div class="participant-row">
-            <div class="avatar-stack" aria-hidden="true">
-              <span
-                v-for="participant in acceptedParticipants(search).slice(0, 2)"
-                :key="participant.id"
-              >
-                {{
-                  (participant.profile.display_name || participant.profile.username)
-                    .charAt(0)
-                    .toUpperCase()
-                }}
+              <span class="role-badge">
+                {{ currentRole(search) === 'owner' ? 'Ma recherche' : 'Partagée avec moi' }}
               </span>
             </div>
 
-            <p>
-              {{
-                acceptedParticipants(search).length === 1
-                  ? 'Recherche individuelle'
-                  : `${acceptedParticipants(search).length} participants`
-              }}
-            </p>
+            <h3>{{ search.title }}</h3>
+
+            <div class="search-meta">
+              <span>{{ search.genders.map(genderLabel).join(' · ') }}</span>
+              <span>
+                {{
+                  acceptedParticipants(search).length === 1
+                    ? 'Individuelle'
+                    : `${acceptedParticipants(search).length} participants`
+                }}
+              </span>
+              <span>Créée le {{ formatShortDate(search.created_at) }}</span>
+            </div>
           </div>
 
           <footer>
-            <span>Créée le {{ formatShortDate(search.created_at) }}</span>
-
             <div class="search-actions">
               <button
                 type="button"
@@ -426,7 +372,7 @@ onMounted(() => {
                 data-test="open-search-details-button"
                 @click="emit('openSearchDetails', search)"
               >
-                {{ search.status === 'active' ? 'Détails' : 'Consulter' }}
+                {{ search.status === 'active' ? 'Gérer' : 'Consulter' }}
               </button>
 
               <button
@@ -450,10 +396,8 @@ onMounted(() => {
           ×
         </button>
 
-        <span class="modal-icon">♡</span>
-        <span class="section-kicker">Nouveau projet</span>
-        <h2 id="create-title">Créer une recherche</h2>
-        <p>Choisis un nom pour la retrouver facilement, puis indique les prénoms à proposer.</p>
+        <h2 id="create-title">Nouvelle recherche</h2>
+        <p>Donne-lui un nom et choisis les types de prénoms à parcourir.</p>
 
         <form data-test="create-search-form" @submit.prevent="createSearch">
           <label for="search-title">Nom de la recherche</label>
@@ -485,81 +429,84 @@ onMounted(() => {
             </div>
           </fieldset>
 
-          <fieldset>
-            <legend>Origines</legend>
-            <p class="filter-help">
-              Aucune sélection signifie que toutes les origines sont admises.
-            </p>
+          <details class="advanced-filters">
+            <summary>
+              <span>Filtres facultatifs</span>
+              <small>Origine, longueur et première lettre</small>
+            </summary>
 
-            <p v-if="originLoadError" class="filter-load-error" role="alert">
-              {{ originLoadError }}
-            </p>
+            <div class="advanced-filters-content">
+              <fieldset>
+                <legend>Origines</legend>
+                <p class="filter-help">Sans sélection, toutes les origines sont proposées.</p>
 
-            <div v-else class="origin-options">
-              <button
-                v-for="origin in originOptions"
-                :key="origin.id"
-                type="button"
-                :class="{ selected: newOrigins.includes(origin.id) }"
-                :title="origin.description"
-                :data-test="`create-search-origin-${origin.id}`"
-                @click="toggleOrigin(origin.id)"
-              >
-                {{ origin.label }}
-              </button>
+                <p v-if="originLoadError" class="filter-load-error" role="alert">
+                  {{ originLoadError }}
+                </p>
+
+                <div v-else class="origin-options">
+                  <button
+                    v-for="origin in originOptions"
+                    :key="origin.id"
+                    type="button"
+                    :class="{ selected: newOrigins.includes(origin.id) }"
+                    :title="origin.description"
+                    :data-test="`create-search-origin-${origin.id}`"
+                    @click="toggleOrigin(origin.id)"
+                  >
+                    {{ origin.label }}
+                  </button>
+                </div>
+              </fieldset>
+
+              <fieldset>
+                <legend>Longueur du prénom</legend>
+                <div class="length-options">
+                  <label>
+                    Minimum
+                    <input
+                      v-model="newMinLength"
+                      data-test="create-search-min-length"
+                      type="number"
+                      min="1"
+                      max="100"
+                      inputmode="numeric"
+                      placeholder="Sans minimum"
+                    />
+                  </label>
+
+                  <label>
+                    Maximum
+                    <input
+                      v-model="newMaxLength"
+                      data-test="create-search-max-length"
+                      type="number"
+                      min="1"
+                      max="100"
+                      inputmode="numeric"
+                      placeholder="Sans maximum"
+                    />
+                  </label>
+                </div>
+              </fieldset>
+
+              <fieldset>
+                <legend>Première lettre</legend>
+                <div class="first-letter-options">
+                  <button
+                    v-for="firstLetter in firstLetterOptions"
+                    :key="firstLetter"
+                    type="button"
+                    :class="{ selected: newFirstLetters.includes(firstLetter) }"
+                    :data-test="`create-search-first-letter-${firstLetter}`"
+                    @click="toggleFirstLetter(firstLetter)"
+                  >
+                    {{ firstLetter }}
+                  </button>
+                </div>
+              </fieldset>
             </div>
-          </fieldset>
-
-          <fieldset>
-            <legend>Longueur du prénom</legend>
-            <div class="length-options">
-              <label>
-                Minimum
-                <input
-                  v-model="newMinLength"
-                  data-test="create-search-min-length"
-                  type="number"
-                  min="1"
-                  max="100"
-                  inputmode="numeric"
-                  placeholder="Sans minimum"
-                />
-              </label>
-
-              <label>
-                Maximum
-                <input
-                  v-model="newMaxLength"
-                  data-test="create-search-max-length"
-                  type="number"
-                  min="1"
-                  max="100"
-                  inputmode="numeric"
-                  placeholder="Sans maximum"
-                />
-              </label>
-            </div>
-          </fieldset>
-
-          <fieldset>
-            <legend>Première lettre</legend>
-            <p class="filter-help">
-              Les lettres accentuées sont regroupées avec leur lettre principale.
-            </p>
-
-            <div class="first-letter-options">
-              <button
-                v-for="firstLetter in firstLetterOptions"
-                :key="firstLetter"
-                type="button"
-                :class="{ selected: newFirstLetters.includes(firstLetter) }"
-                :data-test="`create-search-first-letter-${firstLetter}`"
-                @click="toggleFirstLetter(firstLetter)"
-              >
-                {{ firstLetter }}
-              </button>
-            </div>
-          </fieldset>
+          </details>
 
           <p v-if="createError" class="feedback error-feedback" role="alert">
             {{ createError }}
@@ -588,7 +535,7 @@ onMounted(() => {
 <style scoped>
 .dashboard-content {
   display: grid;
-  gap: 24px;
+  gap: 16px;
 }
 
 .summary-grid {
@@ -653,11 +600,18 @@ onMounted(() => {
 }
 
 .searches-panel {
-  padding: 28px;
-  border: 1px solid rgba(105, 75, 39, 0.1);
-  border-radius: 26px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 22px 50px rgba(130, 83, 32, 0.08);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.searches-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
 }
 
 .panel-heading {
@@ -717,13 +671,16 @@ onMounted(() => {
 .status-filters {
   display: flex;
   gap: 7px;
-  margin: 25px 0 20px;
-  padding-bottom: 18px;
+  margin: 0;
+  padding: 0;
   overflow-x: auto;
-  border-bottom: 1px solid #f0e5da;
+  border: 0;
 }
 
 .status-filters button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   padding: 8px 12px;
   color: #876f5d;
   border: 0;
@@ -735,9 +692,26 @@ onMounted(() => {
   white-space: nowrap;
 }
 
+.status-filters button span {
+  display: grid;
+  min-width: 20px;
+  height: 20px;
+  place-items: center;
+  padding: 0 5px;
+  border-radius: 999px;
+  color: #8f7864;
+  background: #f0ebe5;
+  font-size: 10px;
+}
+
 .status-filters button.selected {
   color: #814b0f;
   background: #fee4b8;
+}
+
+.status-filters button.selected span {
+  color: #ffffff;
+  background: #e98a22;
 }
 
 .panel-state,
@@ -829,16 +803,20 @@ onMounted(() => {
 
 .search-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 17px;
+  grid-template-columns: 1fr;
+  gap: 10px;
 }
 
 .search-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 20px;
   min-width: 0;
-  padding: 21px;
+  padding: 17px 18px;
   border: 1px solid #eee0d2;
-  border-radius: 19px;
-  background: #fffdf9;
+  border-radius: 16px;
+  background: #ffffff;
   transition:
     transform 160ms ease,
     box-shadow 160ms ease,
@@ -846,7 +824,7 @@ onMounted(() => {
 }
 
 .search-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
   border-color: #efc796;
   box-shadow: 0 15px 30px rgba(128, 80, 27, 0.1);
 }
@@ -858,6 +836,10 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.card-topline {
+  justify-content: flex-start;
 }
 
 .status-badge,
@@ -900,9 +882,28 @@ onMounted(() => {
 }
 
 .search-card h3 {
-  margin: 19px 0 13px;
+  margin: 10px 0 7px;
   color: #3e2d20;
-  font-size: 19px;
+  font-size: 18px;
+}
+
+.search-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  color: #89786a;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.search-meta span + span {
+  position: relative;
+}
+
+.search-meta span + span::before {
+  position: absolute;
+  left: -8px;
+  content: "·";
 }
 
 .gender-list {
@@ -958,9 +959,8 @@ onMounted(() => {
 }
 
 .search-card footer {
-  flex-wrap: wrap;
-  padding-top: 16px;
-  border-top: 1px solid #f1e6dc;
+  padding: 0;
+  border: 0;
 }
 
 .search-card footer > span {
@@ -972,7 +972,8 @@ onMounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 8px 10px;
+  min-height: 39px;
+  padding: 8px 13px;
   color: #9a570d;
   border: 0;
   border-radius: 9px;
@@ -1035,7 +1036,7 @@ onMounted(() => {
   position: relative;
   width: min(720px, 100%);
   max-height: calc(100vh - 44px);
-  padding: 32px;
+  padding: 29px;
   overflow-y: auto;
   border-radius: 25px;
   background: #fffdf9;
@@ -1071,7 +1072,7 @@ onMounted(() => {
 }
 
 .create-modal form {
-  margin-top: 24px;
+  margin-top: 20px;
 }
 
 .create-modal label,
@@ -1104,6 +1105,36 @@ fieldset {
   margin: 20px 0 0;
   padding: 0;
   border: 0;
+}
+
+.advanced-filters {
+  margin-top: 20px;
+  border: 1px solid #eadccd;
+  border-radius: 14px;
+  background: #fffaf4;
+}
+
+.advanced-filters summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 15px;
+  color: #684d36;
+  cursor: pointer;
+  font-weight: 850;
+  list-style-position: inside;
+}
+
+.advanced-filters summary small {
+  color: #968272;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.advanced-filters-content {
+  padding: 0 15px 16px;
+  border-top: 1px solid #eadccd;
 }
 
 .gender-options {
@@ -1246,7 +1277,8 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
-  .panel-heading {
+  .panel-heading,
+  .searches-toolbar {
     display: grid;
   }
 
@@ -1254,8 +1286,19 @@ button:disabled {
     width: 100%;
   }
 
-  .searches-panel {
-    padding: 20px;
+  .search-card {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .search-card footer,
+  .search-actions {
+    width: 100%;
+  }
+
+  .search-actions button {
+    flex: 1;
+    justify-content: center;
   }
 
   .first-letter-options {
@@ -1274,6 +1317,12 @@ button:disabled {
 
   .create-modal {
     padding: 27px 20px 20px;
+  }
+
+  .advanced-filters summary {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
   }
 
   .modal-actions {

@@ -51,10 +51,6 @@ const pageTitle = computed(() => {
     return "Tes invitations";
   }
 
-  if (selectedSearch.value) {
-    return "Détail de ta recherche";
-  }
-
   return "Tes recherches de prénoms";
 });
 
@@ -67,11 +63,7 @@ const pageDescription = computed(() => {
     return "Retrouve les recherches auxquelles un autre utilisateur t’invite à participer.";
   }
 
-  if (selectedSearch.value) {
-    return "Consulte les participants, le statut et les fonctionnalités de cette recherche.";
-  }
-
-  return "Crée, partage et retrouve toutes tes recherches au même endroit.";
+  return "Retrouve tes recherches ou commence-en une nouvelle.";
 });
 
 async function loadUser() {
@@ -162,22 +154,22 @@ onMounted(() => {
       <nav aria-label="Navigation principale">
         <button
           type="button"
-          :class="{ active: activeSection === 'invitations' }"
-          data-test="invitations-navigation"
-          @click="showInvitations"
-        >
-          <span class="nav-icon">✉</span>
-          <span>Mes invitations</span>
-        </button>
-
-        <button
-          type="button"
           :class="{ active: activeSection === 'searches' }"
           data-test="searches-navigation"
           @click="showSearches"
         >
           <span class="nav-icon">♡</span>
-          <span>Mes recherches</span>
+          <span>Recherches</span>
+        </button>
+
+        <button
+          type="button"
+          :class="{ active: activeSection === 'invitations' }"
+          data-test="invitations-navigation"
+          @click="showInvitations"
+        >
+          <span class="nav-icon">✉</span>
+          <span>Invitations</span>
         </button>
 
         <button
@@ -187,7 +179,7 @@ onMounted(() => {
           @click="showProfile"
         >
           <span class="nav-icon">○</span>
-          <span>Mon profil</span>
+          <span>Profil</span>
         </button>
       </nav>
 
@@ -277,7 +269,7 @@ onMounted(() => {
       </section>
 
       <template v-else-if="user">
-        <header class="page-heading">
+        <header v-if="!selectedSearch" class="page-heading">
           <div>
             <p>
               Bonjour {{ visibleName }}
@@ -288,10 +280,6 @@ onMounted(() => {
             <span>{{ pageDescription }}</span>
           </div>
 
-          <span class="connected-badge">
-            <span></span>
-            Connecté
-          </span>
         </header>
 
         <SearchDetail
@@ -315,9 +303,6 @@ onMounted(() => {
         <ProfileSettings v-else :user="user" @profile-updated="updateProfile" />
       </template>
 
-      <footer class="app-footer">
-        Le Bon Prénom · Keycloak · Django REST · Vue.js
-      </footer>
     </main>
   </div>
 </template>
@@ -329,7 +314,7 @@ onMounted(() => {
 
 :global(html) {
   min-width: 320px;
-  background: #fff9f0;
+  background: #fbfaf8;
 }
 
 :global(body) {
@@ -337,18 +322,7 @@ onMounted(() => {
   min-height: 100vh;
   margin: 0;
   color: #3f2e20;
-  background:
-    radial-gradient(
-      circle at 88% 4%,
-      rgba(163, 223, 241, 0.32),
-      transparent 27rem
-    ),
-    radial-gradient(
-      circle at 25% 95%,
-      rgba(255, 192, 101, 0.2),
-      transparent 32rem
-    ),
-    #fff9f0;
+  background: #fbfaf8;
   font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
 }
 
@@ -370,7 +344,7 @@ button:not(:disabled):hover {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 255px minmax(0, 1fr);
+  grid-template-columns: 220px minmax(0, 1fr);
   min-height: 100vh;
 }
 
@@ -380,10 +354,9 @@ button:not(:disabled):hover {
   display: flex;
   height: 100vh;
   flex-direction: column;
-  padding: 24px 18px 20px;
+  padding: 22px 14px 16px;
   border-right: 1px solid rgba(126, 83, 35, 0.1);
-  background: rgba(255, 253, 248, 0.93);
-  backdrop-filter: blur(18px);
+  background: #ffffff;
 }
 
 .brand,
@@ -396,9 +369,9 @@ button:not(:disabled):hover {
 }
 
 .brand img {
-  width: 53px;
-  height: 53px;
-  border-radius: 15px;
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
   object-fit: cover;
   box-shadow: 0 10px 24px rgba(238, 137, 27, 0.13);
 }
@@ -426,7 +399,7 @@ button:not(:disabled):hover {
 nav {
   display: grid;
   gap: 7px;
-  margin-top: 42px;
+  margin-top: 30px;
 }
 
 nav button {
@@ -520,10 +493,10 @@ nav button.active {
 }
 
 .main-content {
-  width: min(1180px, 100%);
+  width: min(1120px, 100%);
   min-width: 0;
   margin: 0 auto;
-  padding: 42px 42px 22px;
+  padding: 28px 32px 24px;
 }
 
 .mobile-header {
@@ -535,11 +508,11 @@ nav button.active {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  margin-bottom: 29px;
+  margin-bottom: 22px;
 }
 
 .page-heading p {
-  margin: 0 0 7px;
+  margin: 0 0 5px;
   color: #a16f3e;
   font-size: 12px;
   font-weight: 800;
@@ -548,35 +521,15 @@ nav button.active {
 .page-heading h1 {
   margin: 0;
   color: #3d2c1f;
-  font-size: clamp(29px, 4vw, 42px);
+  font-size: clamp(27px, 3vw, 36px);
   letter-spacing: -0.035em;
 }
 
 .page-heading div > span {
   display: block;
-  margin-top: 8px;
+  margin-top: 5px;
   color: #897568;
   font-size: 14px;
-}
-
-.connected-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 12px;
-  color: #347253;
-  border-radius: 11px;
-  background: #eaf8f0;
-  font-size: 11px;
-  font-weight: 850;
-}
-
-.connected-badge > span {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #4bae78;
-  box-shadow: 0 0 0 4px rgba(75, 174, 120, 0.13);
 }
 
 .app-state {
@@ -634,13 +587,6 @@ nav button.active {
   font-weight: 850;
 }
 
-.app-footer {
-  padding: 30px 0 5px;
-  color: #aa9584;
-  font-size: 10px;
-  text-align: center;
-}
-
 .mobile-actions {
   display: flex;
   align-items: center;
@@ -685,7 +631,7 @@ nav button.active {
   }
 
   .main-content {
-    padding: 0 24px 22px;
+    padding: 0 20px 22px;
   }
 
   .mobile-header {
@@ -693,7 +639,7 @@ nav button.active {
     min-height: 76px;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 25px;
+    margin-bottom: 18px;
     border-bottom: 1px solid #eddfd1;
   }
 
@@ -717,10 +663,6 @@ nav button.active {
 @media (max-width: 600px) {
   .main-content {
     padding: 0 15px 18px;
-  }
-
-  .connected-badge {
-    display: none;
   }
 
   .page-heading h1 {

@@ -12,7 +12,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   back: []
-  details: []
   searchUpdated: [search: NameSearch]
 }>()
 
@@ -175,30 +174,8 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="browser-shell">
-    <header class="browser-header">
-      <div class="navigation-actions">
-        <button
-          type="button"
-          class="back-button"
-          data-test="back-to-searches"
-          @click="emit('back')"
-        >
-          <span>←</span>
-          Retour aux recherches
-        </button>
-
-        <button
-          type="button"
-          class="details-button"
-          data-test="open-current-search-details"
-          @click="emit('details')"
-        >
-          Détails
-        </button>
-      </div>
-
+    <header v-if="canEditFilters" class="browser-header">
       <button
-        v-if="canEditFilters"
         type="button"
         class="filters-button"
         data-test="open-quick-filters"
@@ -209,12 +186,6 @@ onBeforeUnmount(() => {
         <strong v-if="activeFilterCount > 0">{{ activeFilterCount }}</strong>
       </button>
     </header>
-
-    <div class="title-block">
-      <span class="section-kicker">{{ search.title }}</span>
-      <h2>Parcourir les prénoms</h2>
-      <p>Découvre une proposition à la fois et indique simplement ce que tu en penses.</p>
-    </div>
 
     <Transition name="match-toast">
       <aside
@@ -329,48 +300,14 @@ onBeforeUnmount(() => {
 <style scoped>
 .browser-shell {
   display: grid;
-  gap: 20px;
+  gap: 12px;
 }
 
 .browser-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
-}
-
-.navigation-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 16px;
-}
-
-.back-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0;
-  color: #7d6552;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-  font-weight: 800;
-}
-
-.back-button span {
-  font-size: 1.15rem;
-}
-
-.details-button {
-  min-height: 36px;
-  padding: 0 12px;
-  color: #6f5540;
-  border: 1px solid #e6d3bf;
-  border-radius: 11px;
-  background: rgba(255, 255, 255, 0.88);
-  cursor: pointer;
-  font-weight: 850;
 }
 
 .filters-button {
@@ -414,30 +351,6 @@ onBeforeUnmount(() => {
   padding: 16px;
   background: rgba(64, 43, 25, 0.35);
   backdrop-filter: blur(4px);
-}
-
-.title-block {
-  text-align: center;
-}
-
-.section-kicker {
-  color: #eb8a20;
-  font-size: 0.72rem;
-  font-weight: 900;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.title-block h2 {
-  margin: 6px 0 8px;
-  color: #45301f;
-  font-size: clamp(2rem, 5vw, 3rem);
-  letter-spacing: -0.04em;
-}
-
-.title-block p {
-  margin: 0;
-  color: #887361;
 }
 
 .match-notification {
@@ -517,12 +430,12 @@ onBeforeUnmount(() => {
 .state-card,
 .finished-card,
 .name-card {
-  width: min(680px, 100%);
+  width: min(660px, 100%);
   margin: 0 auto;
   border: 1px solid rgba(126, 83, 35, 0.12);
-  border-radius: 28px;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 24px 65px rgba(105, 70, 31, 0.11);
+  border-radius: 21px;
+  background: #ffffff;
+  box-shadow: 0 16px 42px rgba(105, 70, 31, 0.08);
 }
 
 .state-card {
@@ -616,7 +529,7 @@ onBeforeUnmount(() => {
 .name-card {
   position: relative;
   overflow: hidden;
-  padding: 42px;
+  padding: 25px 28px;
   background:
     radial-gradient(circle at 95% 7%, rgba(163, 223, 241, 0.5), transparent 15rem),
     radial-gradient(circle at 4% 97%, rgba(255, 192, 101, 0.28), transparent 14rem),
@@ -625,10 +538,10 @@ onBeforeUnmount(() => {
 
 .name-decoration {
   position: absolute;
-  top: 23px;
-  right: 28px;
+  top: 17px;
+  right: 21px;
   color: rgba(237, 139, 33, 0.22);
-  font-size: 4rem;
+  font-size: 3rem;
   font-weight: 900;
 }
 
@@ -639,7 +552,7 @@ onBeforeUnmount(() => {
 
 .gender-badge {
   display: inline-flex;
-  padding: 7px 12px;
+  padding: 5px 10px;
   color: #276f84;
   border-radius: 999px;
   background: #e0f5fb;
@@ -648,9 +561,9 @@ onBeforeUnmount(() => {
 }
 
 .name-content h3 {
-  margin: 15px 0 28px;
+  margin: 8px 0 18px;
   color: #44301f;
-  font-size: clamp(3rem, 9vw, 5.4rem);
+  font-size: clamp(2.8rem, 7vw, 4.25rem);
   letter-spacing: -0.055em;
   line-height: 1;
 }
@@ -665,7 +578,7 @@ dl {
 
 dl div {
   min-width: 0;
-  padding: 16px;
+  padding: 12px 14px;
   border: 1px solid #f0e3d5;
   border-radius: 16px;
   background: rgba(255, 252, 247, 0.78);
@@ -680,27 +593,28 @@ dt {
 }
 
 dd {
-  margin: 7px 0 0;
+  margin: 5px 0 0;
   color: #654c37;
-  line-height: 1.5;
+  font-size: 0.9rem;
+  line-height: 1.42;
 }
 
 .decision-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 11px;
-  margin-top: 28px;
+  margin-top: 18px;
 }
 
 .decision-actions button {
-  display: grid;
-  min-height: 70px;
-  gap: 4px;
+  display: flex;
+  min-height: 55px;
+  gap: 8px;
   place-items: center;
   padding: 10px;
   border-radius: 15px;
   cursor: pointer;
-  font-size: 0.83rem;
+  font-size: 0.86rem;
   font-weight: 850;
   transition:
     transform 150ms ease,
@@ -718,7 +632,7 @@ dd {
 }
 
 .decision-actions button span {
-  font-size: 1.45rem;
+  font-size: 1.2rem;
   line-height: 1;
 }
 

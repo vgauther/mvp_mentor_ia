@@ -112,63 +112,14 @@ function formatDate(value: string) {
 </script>
 
 <template>
-  <div class="settings-stack">
-    <section class="settings-card account-card">
-      <div class="section-heading">
+  <div class="profile-content">
+    <section class="profile-card">
+      <div class="profile-heading">
         <div>
-          <span class="section-kicker">Mon compte</span>
-          <h2>Informations personnelles</h2>
-        </div>
-
-        <span class="section-number">01</span>
-      </div>
-
-      <dl class="profile-data">
-        <div>
-          <dt>Nom d’utilisateur</dt>
-          <dd>@{{ user.username }}</dd>
-        </div>
-
-        <div>
-          <dt>Adresse e-mail</dt>
-          <dd>{{ user.email || 'Non renseignée' }}</dd>
-        </div>
-
-        <div>
-          <dt>Identifiant</dt>
-          <dd>#{{ user.id }}</dd>
-        </div>
-
-        <div>
-          <dt>Membre depuis</dt>
-          <dd>{{ formatDate(user.created_at) }}</dd>
-        </div>
-      </dl>
-
-      <div class="roles-block">
-        <span>Rôles Keycloak</span>
-
-        <div class="role-list">
-          <span v-for="role in user.roles" :key="role" class="role-badge">{{ role }}</span>
-          <span v-if="user.roles.length === 0" class="muted-value">Aucun rôle</span>
-        </div>
-      </div>
-    </section>
-
-    <section class="settings-card">
-      <div class="section-heading">
-        <div>
-          <span class="section-kicker">Personnalisation</span>
           <h2>Nom d’affichage</h2>
+          <p>C’est le nom que les autres participants voient dans l’application.</p>
         </div>
-
-        <span class="section-number">02</span>
       </div>
-
-      <p class="section-description">
-        Ce nom est visible dans l’application. Ton identifiant et ton e-mail restent administrés par
-        Keycloak.
-      </p>
 
       <form data-test="profile-form" @submit.prevent="saveDisplayName">
         <label for="display-name">Nom affiché dans l’application</label>
@@ -192,62 +143,175 @@ function formatDate(value: string) {
           {{ isSaving ? 'Enregistrement…' : 'Enregistrer le nom' }}
         </button>
       </form>
-    </section>
 
-    <section class="settings-card lookup-card">
-      <div class="section-heading">
+      <dl class="profile-data">
         <div>
-          <span class="section-kicker">Invitations</span>
-          <h2>Rechercher un utilisateur</h2>
+          <dt>Nom d’utilisateur</dt>
+          <dd>@{{ user.username }}</dd>
         </div>
 
-        <span class="section-number">03</span>
+        <div>
+          <dt>Adresse e-mail</dt>
+          <dd>{{ user.email || 'Non renseignée' }}</dd>
+        </div>
+
+        <div>
+          <dt>Membre depuis</dt>
+          <dd>{{ formatDate(user.created_at) }}</dd>
+        </div>
+      </dl>
+
+      <details class="technical-details">
+        <summary>Informations techniques du compte</summary>
+        <p>Identifiant interne : #{{ user.id }}</p>
+        <div class="role-list">
+          <span v-for="role in user.roles" :key="role" class="role-badge">{{ role }}</span>
+          <span v-if="user.roles.length === 0" class="muted-value">Aucun rôle Keycloak</span>
+        </div>
+      </details>
+    </section>
+
+    <details class="profile-card lookup-card">
+      <summary>
+        <span>Rechercher un utilisateur</span>
+        <small>Outil facultatif pour vérifier une adresse e-mail</small>
+      </summary>
+
+      <div class="lookup-content">
+        <p>Tu pourras ensuite l’inviter depuis l’onglet Participants d’une recherche.</p>
+
+        <form class="lookup-form" data-test="lookup-form" @submit.prevent="searchProfile">
+          <div>
+            <label for="lookup-email">Adresse e-mail exacte</label>
+            <input
+              id="lookup-email"
+              v-model="lookupEmail"
+              data-test="lookup-email-input"
+              type="email"
+              placeholder="utilisateur@exemple.fr"
+              autocomplete="off"
+            />
+          </div>
+
+          <button type="submit" class="secondary-button" :disabled="isSearching">
+            {{ isSearching ? 'Recherche…' : 'Rechercher' }}
+          </button>
+        </form>
+
+        <p v-if="lookupError" class="form-message error-message" role="alert">
+          {{ lookupError }}
+        </p>
+
+        <article v-if="foundProfile" class="search-result" data-test="lookup-result">
+          <span class="result-avatar">
+            {{ (foundProfile.display_name || foundProfile.username).charAt(0).toUpperCase() }}
+          </span>
+
+          <div>
+            <small>Utilisateur trouvé</small>
+            <strong>{{ foundProfile.display_name || foundProfile.username }}</strong>
+            <p>{{ foundProfile.email }} · @{{ foundProfile.username }}</p>
+          </div>
+
+          <span class="result-check" aria-label="Utilisateur trouvé">✓</span>
+        </article>
       </div>
-
-      <p class="section-description">
-        Retrouve une personne avec son adresse e-mail exacte avant de l’inviter dans une recherche.
-      </p>
-
-      <form class="lookup-form" data-test="lookup-form" @submit.prevent="searchProfile">
-        <div>
-          <label for="lookup-email">Adresse e-mail exacte</label>
-          <input
-            id="lookup-email"
-            v-model="lookupEmail"
-            data-test="lookup-email-input"
-            type="email"
-            placeholder="utilisateur@exemple.fr"
-            autocomplete="off"
-          />
-        </div>
-
-        <button type="submit" class="secondary-button" :disabled="isSearching">
-          {{ isSearching ? 'Recherche…' : 'Rechercher' }}
-        </button>
-      </form>
-
-      <p v-if="lookupError" class="form-message error-message" role="alert">
-        {{ lookupError }}
-      </p>
-
-      <article v-if="foundProfile" class="search-result" data-test="lookup-result">
-        <span class="result-avatar">
-          {{ (foundProfile.display_name || foundProfile.username).charAt(0).toUpperCase() }}
-        </span>
-
-        <div>
-          <small>Utilisateur trouvé</small>
-          <strong>{{ foundProfile.display_name || foundProfile.username }}</strong>
-          <p>{{ foundProfile.email }} · @{{ foundProfile.username }}</p>
-        </div>
-
-        <span class="result-check" aria-label="Utilisateur trouvé">✓</span>
-      </article>
-    </section>
+    </details>
   </div>
 </template>
 
 <style scoped>
+.profile-content {
+  display: grid;
+  width: min(760px, 100%);
+  gap: 12px;
+}
+
+.profile-card {
+  padding: 24px;
+  border: 1px solid rgba(105, 75, 39, 0.1);
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 12px 32px rgba(130, 83, 32, 0.05);
+}
+
+.profile-heading {
+  margin-bottom: 20px;
+}
+
+.profile-heading h2 {
+  margin: 0;
+}
+
+.profile-heading p {
+  margin: 6px 0 0;
+  color: #7c6b5c;
+  font-size: 13px;
+}
+
+.profile-card form[data-test='profile-form'] {
+  max-width: 560px;
+}
+
+.profile-card .profile-data {
+  margin-top: 28px;
+}
+
+.technical-details {
+  margin-top: 17px;
+  padding-top: 15px;
+  border-top: 1px solid #f0e5d8;
+}
+
+.technical-details summary,
+.lookup-card > summary {
+  color: #765f4d;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.technical-details p {
+  margin: 14px 0 10px;
+  color: #887668;
+  font-size: 12px;
+}
+
+.lookup-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.lookup-card > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  list-style-position: inside;
+}
+
+.lookup-card > summary span {
+  color: #4b3829;
+}
+
+.lookup-card > summary small {
+  color: #978474;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.lookup-content {
+  padding: 0 20px 20px;
+  border-top: 1px solid #f0e5d8;
+}
+
+.lookup-content > p {
+  margin: 17px 0;
+  color: #7c6b5c;
+  font-size: 13px;
+}
+
 .settings-stack {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -504,6 +568,20 @@ button:disabled {
 
   .secondary-button {
     width: 100%;
+  }
+
+  .profile-card {
+    padding: 20px;
+  }
+
+  .lookup-card {
+    padding: 0;
+  }
+
+  .lookup-card > summary {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
   }
 }
 </style>

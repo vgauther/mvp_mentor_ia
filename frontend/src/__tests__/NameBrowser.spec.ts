@@ -76,9 +76,11 @@ describe('NameBrowser', () => {
     expect(wrapper.text()).toContain('J’aime')
     expect(wrapper.text()).not.toContain('Passer')
     expect(wrapper.text()).not.toContain('parcouru')
+    expect(wrapper.find('.title-block').exists()).toBe(false)
+    expect(wrapper.get('.name-card').findAll('.decision-actions button')).toHaveLength(2)
   })
 
-  it('permet d’ouvrir les détails de la recherche depuis le parcours', async () => {
+  it('laisse la navigation de la recherche au composant parent', async () => {
     authenticatedFetchMock.mockResolvedValueOnce(jsonResponse(firstName))
 
     const wrapper = mount(NameBrowser, {
@@ -89,9 +91,9 @@ describe('NameBrowser', () => {
     })
 
     await flushPromises()
-    await wrapper.get('[data-test="open-current-search-details"]').trigger('click')
 
-    expect(wrapper.emitted('details')).toHaveLength(1)
+    expect(wrapper.find('[data-test="open-current-search-details"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="back-to-searches"]').exists()).toBe(false)
   })
 
   it('enregistre un choix puis charge le prénom suivant', async () => {
