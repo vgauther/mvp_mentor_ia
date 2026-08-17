@@ -120,6 +120,83 @@ Principaux endpoints :
 - `POST /api/admin/trainings/<id>/structure/publish/` ;
 - `GET /api/admin/trainings/<id>/raw-materials/<source-id>/download/`.
 
+## API publique des formations
+
+Une API REST versionnée expose en lecture seule les formations dont la
+structure a été publiée. Elle ne demande aucun jeton d'authentification :
+
+- `GET /api/public/v1/trainings/` : liste des formations publiées ;
+- `GET /api/public/v1/trainings/<id>/` : détail d'une formation, objectifs,
+  structure imbriquée et contenus bruts ;
+- `GET /api/public/v1/trainings/<id>/raw-materials/<source-id>/file/` : fichier
+  original public d'une source PDF ou vidéo.
+
+Les formations en brouillon ou en cours de structuration répondent `404` sur
+les routes de détail et ne figurent pas dans la liste. Les routes publiques
+n'acceptent que `GET` ; toute écriture reste dans l'API d'administration.
+
+Exemple :
+
+```bash
+curl https://formation.example.com/api/public/v1/trainings/
+curl https://formation.example.com/api/public/v1/trainings/1/
+```
+
+La réponse de détail suit cette forme :
+
+```json
+{
+  "id": 1,
+  "title": "Formation publique",
+  "description": "Description du parcours",
+  "published_at": "2026-08-17T10:00:00Z",
+  "updated_at": "2026-08-17T10:00:00Z",
+  "objectives": [
+    {
+      "id": 1,
+      "title": "Maîtriser le sujet",
+      "description": "",
+      "position": 1
+    }
+  ],
+  "structure": [
+    {
+      "id": 1,
+      "kind": "module",
+      "title": "Fondamentaux",
+      "notes": "",
+      "position": 1,
+      "objective_ids": [],
+      "raw_material_ids": [],
+      "children": []
+    }
+  ],
+  "raw_materials": [
+    {
+      "id": 1,
+      "kind": "text",
+      "name": "Première ligne du contenu",
+      "content": "Contenu texte brut",
+      "quiz_data": {},
+      "has_file": false,
+      "file_url": null,
+      "original_filename": "",
+      "mime_type": "",
+      "size": 18
+    }
+  ]
+}
+```
+
+Pour un texte, la donnée originale se trouve dans `content`. Pour un quiz, elle
+se trouve dans `quiz_data`. Pour un PDF ou une vidéo, `file_url` pointe vers le
+fichier original et les métadonnées sont fournies dans la même ressource.
+
+En production, le proxy HTTPS doit transmettre `/api/` au service backend et
+le domaine public doit figurer dans `DJANGO_ALLOWED_HOSTS`. Si l'API est appelée
+directement depuis du JavaScript hébergé sur un autre domaine, ajoutez aussi
+l'origine de ce site à `CORS_ALLOWED_ORIGINS`.
+
 ## Développement local hors Docker
 
 Backend :

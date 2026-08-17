@@ -9,6 +9,9 @@ from .views import (
     LearningObjectiveListCreateView,
     LearnerTrainingListView,
     MeView,
+    PublicRawMaterialFileView,
+    PublicTrainingDetailView,
+    PublicTrainingListView,
     RawMaterialDetailView,
     RawMaterialDownloadView,
     RawMaterialListCreateView,
@@ -27,6 +30,22 @@ from .views import (
 
 urlpatterns = [
     path("health/", HealthView.as_view(), name="health"),
+    path(
+        "public/v1/trainings/",
+        PublicTrainingListView.as_view(),
+        name="public-training-list",
+    ),
+    path(
+        "public/v1/trainings/<int:training_id>/",
+        PublicTrainingDetailView.as_view(),
+        name="public-training-detail",
+    ),
+    path(
+        "public/v1/trainings/<int:training_id>/raw-materials/"
+        "<int:material_id>/file/",
+        PublicRawMaterialFileView.as_view(),
+        name="public-raw-material-file",
+    ),
     path("me/", MeView.as_view(), name="me"),
     path("admin/", AdminView.as_view(), name="admin"),
     path("admin/users/", UserListView.as_view(), name="user-list"),

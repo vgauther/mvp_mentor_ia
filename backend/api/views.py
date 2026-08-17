@@ -29,6 +29,8 @@ from .serializers import (
     ProfileRoleUpdateSerializer,
     ProfileSerializer,
     ProfileTrainingAssignmentSerializer,
+    PublicTrainingDetailSerializer,
+    PublicTrainingListSerializer,
     RawMaterialSerializer,
     TrainingDetailSerializer,
     TrainingListSerializer,
@@ -55,11 +57,85 @@ def training_queryset():
     )
 
 
+def public_training_queryset():
+    return (
+        Training.objects.filter(
+            status=Training.Status.READY,
+            structure_generation__published_at__isnull=False,
+        )
+        .select_related("structure_generation")
+        .prefetch_related(
+            "objectives",
+            "units__objectives",
+            "units__raw_materials",
+            "raw_materials",
+        )
+        .order_by("id")
+    )
+
+
 class HealthView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
         return Response({"project": "Mentor IA", "status": "ok"})
+
+
+class PublicTrainingListView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        serializer = PublicTrainingListSerializer(
+            public_training_queryset(),
+            many=True,
+            context={"request": request},
+        )
+        return Response(serializer.data)
+
+
+class PublicTrainingDetailView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def get(self, request, training_id):
+        training = get_object_or_404(
+            public_training_queryset(),
+            pk=training_id,
+        )
+        serializer = PublicTrainingDetailSerializer(
+            training,
+            context={"request": request},
+        )
+        return Response(serializer.data)
+
+
+class PublicRawMaterialFileView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def get(self, request, training_id, material_id):
+        material = get_object_or_404(
+            RawMaterial,
+            pk=material_id,
+            training_id=training_id,
+            training__status=Training.Status.READY,
+            training__structure_generation__published_at__isnull=False,
+        )
+        if not material.file:
+            return Response(
+                {"detail": "Cette ressource ne contient pas de fichier."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        response = FileResponse(
+            material.file.open("rb"),
+            as_attachment=False,
+            filename=material.original_filename or Path(material.file.name).name,
+            content_type=material.mime_type or "application/octet-stream",
+        )
+        response["Cache-Control"] = "public, max-age=3600"
+        return response
 
 
 class MeView(APIView):

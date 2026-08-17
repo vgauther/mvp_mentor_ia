@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from .authentication import KeycloakUser, get_or_sync_profile
@@ -746,4 +747,196 @@ class AdminTrainingApiTests(TestCase):
                 format="json",
             ).status_code,
             403,
+        )
+
+
+class PublicTrainingApiTests(TestCase):
+    def setUp(self):
+        self.media_directory = tempfile.TemporaryDirectory()
+        self.media_override = override_settings(MEDIA_ROOT=self.media_directory.name)
+        self.media_override.enable()
+        self.client = APIClient()
+        self.profile = Profile.objects.create(
+            keycloak_id="public-api-admin",
+            username="public-api-admin",
+            role=Profile.Role.ADMIN,
+        )
+
+    def tearDown(self):
+        self.media_override.disable()
+        self.media_directory.cleanup()
+
+    def create_published_training(self):
+        training = Training.objects.create(
+            title="Formation publique",
+            description="Description publique",
+            status=Training.Status.READY,
+            created_by=self.profile,
+        )
+        CourseStructureGeneration.objects.create(
+            training=training,
+            status=CourseStructureGeneration.Status.READY,
+            structure={},
+            published_at=timezone.now(),
+            published_by=self.profile,
+        )
+        objective = training.objectives.create(
+            title="Maîtriser le sujet",
+            description="Objectif public",
+            position=1,
+        )
+        text_material = RawMaterial.objects.create(
+            training=training,
+            kind=RawMaterial.Kind.TEXT,
+            content="Contenu brut de référence",
+            size=25,
+            created_by=self.profile,
+        )
+        quiz_material = RawMaterial.objects.create(
+            training=training,
+            kind=RawMaterial.Kind.QUIZ,
+            quiz_data={
+                "title": "Validation",
+                "questions": [
+                    {
+                        "type": "short_text",
+                        "prompt": "Question publique ?",
+                        "accepted_answers": ["Réponse"],
+                    }
+                ],
+            },
+            size=100,
+            created_by=self.profile,
+        )
+        file_material = RawMaterial.objects.create(
+            training=training,
+            kind=RawMaterial.Kind.PDF,
+            file=SimpleUploadedFile(
+                "support.pdf",
+                b"%PDF-1.4 public",
+                content_type="application/pdf",
+            ),
+            original_filename="support.pdf",
+            mime_type="application/pdf",
+            size=15,
+            created_by=self.profile,
+        )
+
+        module = CourseUnit.objects.create(
+            training=training,
+            kind=CourseUnit.Kind.MODULE,
+            working_title="Module public",
+            position=1,
+        )
+        chapter = CourseUnit.objects.create(
+            training=training,
+            parent=module,
+            kind=CourseUnit.Kind.CHAPTER,
+            working_title="Chapitre public",
+            position=2,
+        )
+        section = CourseUnit.objects.create(
+            training=training,
+            parent=chapter,
+            kind=CourseUnit.Kind.SECTION,
+            working_title="Section publique",
+            notes="Notes de structure",
+            position=3,
+        )
+        section.objectives.add(objective)
+        section.raw_materials.add(text_material, quiz_material, file_material)
+        return training, file_material
+
+    def test_only_published_trainings_are_listed_without_authentication(self):
+        published, _ = self.create_published_training()
+        Training.objects.create(
+            title="Brouillon privé",
+            status=Training.Status.DRAFT,
+            created_by=self.profile,
+        )
+
+        response = self.client.get(
+            "/api/public/v1/trainings/",
+            HTTP_AUTHORIZATION="Bearer deliberately-invalid",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(response.json()[0]["id"], published.id)
+        self.assertIn("published_at", response.json()[0])
+
+    def test_detail_exposes_nested_structure_and_raw_json_content(self):
+        training, file_material = self.create_published_training()
+
+        response = self.client.get(f"/api/public/v1/trainings/{training.id}/")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["title"], "Formation publique")
+        self.assertEqual(payload["objectives"][0]["title"], "Maîtriser le sujet")
+        section = payload["structure"][0]["children"][0]["children"][0]
+        self.assertEqual(section["kind"], CourseUnit.Kind.SECTION)
+        self.assertEqual(section["title"], "Section publique")
+        self.assertEqual(len(section["raw_material_ids"]), 3)
+
+        materials_by_kind = {
+            material["kind"]: material for material in payload["raw_materials"]
+        }
+        self.assertEqual(
+            materials_by_kind[RawMaterial.Kind.TEXT]["content"],
+            "Contenu brut de référence",
+        )
+        self.assertEqual(
+            materials_by_kind[RawMaterial.Kind.QUIZ]["quiz_data"]["title"],
+            "Validation",
+        )
+        self.assertEqual(
+            materials_by_kind[RawMaterial.Kind.PDF]["file_url"],
+            "http://testserver/api/public/v1/trainings/"
+            f"{training.id}/raw-materials/{file_material.id}/file/",
+        )
+
+    def test_public_file_is_available_only_for_a_published_training(self):
+        training, file_material = self.create_published_training()
+        file_url = (
+            f"/api/public/v1/trainings/{training.id}/raw-materials/"
+            f"{file_material.id}/file/"
+        )
+
+        response = self.client.get(file_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertEqual(response["Cache-Control"], "public, max-age=3600")
+        self.assertEqual(
+            b"".join(response.streaming_content),
+            b"%PDF-1.4 public",
+        )
+
+        training.status = Training.Status.DRAFT
+        training.save(update_fields=["status", "updated_at"])
+        self.assertEqual(self.client.get(file_url).status_code, 404)
+        self.assertEqual(
+            self.client.get(f"/api/public/v1/trainings/{training.id}/").status_code,
+            404,
+        )
+
+    def test_public_api_is_read_only(self):
+        training, _ = self.create_published_training()
+
+        self.assertEqual(
+            self.client.post(
+                "/api/public/v1/trainings/",
+                {"title": "Interdit"},
+                format="json",
+            ).status_code,
+            405,
+        )
+        self.assertEqual(
+            self.client.patch(
+                f"/api/public/v1/trainings/{training.id}/",
+                {"title": "Interdit"},
+                format="json",
+            ).status_code,
+            405,
         )

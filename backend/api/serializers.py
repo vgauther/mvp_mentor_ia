@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from django.conf import settings
+from django.urls import reverse
 from rest_framework import serializers
 
 from .models import (
@@ -537,3 +538,104 @@ class TrainingDetailSerializer(TrainingListSerializer):
 
     def get_enrichment_ai_configured(self, obj):
         return bool(settings.OPENAI_API_KEY)
+
+
+class PublicLearningObjectiveSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LearningObjective
+        fields = ("id", "title", "description", "position")
+
+
+class PublicRawMaterialSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(source="display_name", read_only=True)
+    has_file = serializers.SerializerMethodField()
+    file_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = RawMaterial
+        fields = (
+            "id",
+            "kind",
+            "name",
+            "content",
+            "quiz_data",
+            "has_file",
+            "file_url",
+            "original_filename",
+            "mime_type",
+            "size",
+        )
+
+    def get_has_file(self, obj):
+        return bool(obj.file)
+
+    def get_file_url(self, obj):
+        if not obj.file:
+            return None
+
+        path = reverse(
+            "public-raw-material-file",
+            kwargs={
+                "training_id": obj.training_id,
+                "material_id": obj.id,
+            },
+        )
+        request = self.context.get("request")
+        return request.build_absolute_uri(path) if request else path
+
+
+class PublicTrainingListSerializer(serializers.ModelSerializer):
+    published_at = serializers.DateTimeField(
+        source="structure_generation.published_at",
+        read_only=True,
+    )
+
+    class Meta:
+        model = Training
+        fields = (
+            "id",
+            "title",
+            "description",
+            "published_at",
+            "updated_at",
+        )
+
+
+class PublicTrainingDetailSerializer(PublicTrainingListSerializer):
+    objectives = PublicLearningObjectiveSerializer(many=True, read_only=True)
+    structure = serializers.SerializerMethodField()
+    raw_materials = PublicRawMaterialSerializer(many=True, read_only=True)
+
+    class Meta(PublicTrainingListSerializer.Meta):
+        fields = PublicTrainingListSerializer.Meta.fields + (
+            "objectives",
+            "structure",
+            "raw_materials",
+        )
+
+    def get_structure(self, obj):
+        units = list(obj.units.all())
+        children_by_parent = {}
+        for unit in units:
+            children_by_parent.setdefault(unit.parent_id, []).append(unit)
+
+        def serialize_unit(unit):
+            return {
+                "id": unit.id,
+                "kind": unit.kind,
+                "title": unit.working_title,
+                "notes": unit.notes,
+                "position": unit.position,
+                "objective_ids": [
+                    objective.id for objective in unit.objectives.all()
+                ],
+                "raw_material_ids": [
+                    material.id for material in unit.raw_materials.all()
+                ],
+                "children": [
+                    serialize_unit(child)
+                    for child in children_by_parent.get(unit.id, [])
+                ],
+            }
+
+        return [serialize_unit(unit) for unit in children_by_parent.get(None, [])]
