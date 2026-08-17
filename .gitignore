@@ -39,6 +39,4 @@ Thumbs.db
 Desktop.ini
 .DS_Store
 
-# Catalogue de prénoms fourni localement
-/prenoms_uniques.csv
 /backups/
