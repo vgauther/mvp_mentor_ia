@@ -3,6 +3,7 @@ from typing import Any
 
 import jwt
 from django.conf import settings
+from django.db import connection, transaction
 from jwt import PyJWKClient
 from jwt.exceptions import InvalidTokenError, PyJWKClientError
 from rest_framework.authentication import (
@@ -40,26 +41,42 @@ class KeycloakUser:
 
     @property
     def is_staff(self) -> bool:
-        return "admin" in self.roles
+        return self.profile.role == Profile.Role.ADMIN
 
     @property
     def is_superuser(self) -> bool:
-        return "admin" in self.roles
+        return self.profile.role == Profile.Role.ADMIN
 
 
+@transaction.atomic
 def get_or_sync_profile(
     *,
     keycloak_id: str,
     username: str,
     email: str | None,
 ) -> Profile:
-    profile, _ = Profile.objects.get_or_create(
-        keycloak_id=keycloak_id,
-        defaults={
-            "username": username,
-            "email": email,
-        },
-    )
+    # PostgreSQL sérialise la création du premier profil afin qu'un seul compte
+    # puisse recevoir automatiquement le rôle administrateur.
+    if connection.vendor == "postgresql":
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "LOCK TABLE api_profile IN SHARE ROW EXCLUSIVE MODE"
+            )
+
+    try:
+        profile = Profile.objects.get(keycloak_id=keycloak_id)
+    except Profile.DoesNotExist:
+        is_first_profile = not Profile.objects.exists()
+        profile = Profile.objects.create(
+            keycloak_id=keycloak_id,
+            username=username,
+            email=email,
+            role=(
+                Profile.Role.ADMIN
+                if is_first_profile
+                else Profile.Role.LEARNER
+            ),
+        )
 
     changed_fields = []
 
@@ -130,9 +147,6 @@ class KeycloakAuthentication(BaseAuthentication):
                 "Le jeton Keycloak est invalide ou expiré."
             ) from error
 
-        realm_access = claims.get("realm_access", {})
-        roles = frozenset(realm_access.get("roles", []))
-
         username = claims.get("preferred_username") or claims["sub"]
         email = claims.get("email") or None
 
@@ -146,7 +160,7 @@ class KeycloakAuthentication(BaseAuthentication):
             id=claims["sub"],
             username=username,
             email=email,
-            roles=roles,
+            roles=frozenset({profile.role}),
             claims=claims,
             profile=profile,
         )

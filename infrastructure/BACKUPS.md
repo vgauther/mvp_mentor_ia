@@ -10,7 +10,7 @@ Le projet possède deux bases PostgreSQL distinctes :
 Par défaut, les archives sont stockées dans :
 
 ```text
-/var/backups/le-bon-prenom
+/var/backups/mentor-ia
 ```
 
 Les fichiers sont nommés ainsi :
@@ -66,7 +66,7 @@ docker compose \
   -f infrastructure/compose.yml \
   exec -T postgres \
   pg_restore --list \
-  < /var/backups/le-bon-prenom/django_DATE_HEURE.dump \
+  < /var/backups/mentor-ia/django_DATE_HEURE.dump \
   > /dev/null
 ```
 
@@ -78,7 +78,7 @@ docker compose \
   -f infrastructure/compose.yml \
   exec -T keycloak-postgres \
   pg_restore --list \
-  < /var/backups/le-bon-prenom/keycloak_DATE_HEURE.dump \
+  < /var/backups/mentor-ia/keycloak_DATE_HEURE.dump \
   > /dev/null
 ```
 
@@ -90,29 +90,29 @@ Créer le dossier de sauvegarde :
 
 ```bash
 sudo install -d \
-  -o victor \
-  -g victor \
+  -o mentor-ia \
+  -g mentor-ia \
   -m 700 \
-  /var/backups/le-bon-prenom
+  /var/backups/mentor-ia
 ```
 
 Installer les unités `systemd` :
 
 ```bash
 sudo install -m 644 \
-  infrastructure/systemd/le-bon-prenom-backup.service \
-  /etc/systemd/system/le-bon-prenom-backup.service
+  infrastructure/systemd/mentor-ia-backup.service \
+  /etc/systemd/system/mentor-ia-backup.service
 
 sudo install -m 644 \
-  infrastructure/systemd/le-bon-prenom-backup.timer \
-  /etc/systemd/system/le-bon-prenom-backup.timer
+  infrastructure/systemd/mentor-ia-backup.timer \
+  /etc/systemd/system/mentor-ia-backup.timer
 ```
 
 Activer le timer :
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable --now le-bon-prenom-backup.timer
+sudo systemctl enable --now mentor-ia-backup.timer
 ```
 
 La sauvegarde est programmée chaque jour à 03:00, heure de Paris.
@@ -124,11 +124,11 @@ Vérifier la programmation :
 
 ```bash
 systemctl list-timers --all \
-  le-bon-prenom-backup.timer \
+  mentor-ia-backup.timer \
   --no-pager
 
 systemctl status \
-  le-bon-prenom-backup.timer \
+  mentor-ia-backup.timer \
   --no-pager
 ```
 
@@ -137,18 +137,18 @@ systemctl status \
 Une exécution manuelle peut être déclenchée avec :
 
 ```bash
-sudo systemctl start le-bon-prenom-backup.service
+sudo systemctl start mentor-ia-backup.service
 ```
 
 Consulter ensuite son état et ses journaux :
 
 ```bash
 systemctl status \
-  le-bon-prenom-backup.service \
+  mentor-ia-backup.service \
   --no-pager
 
 journalctl \
-  -u le-bon-prenom-backup.service \
+  -u mentor-ia-backup.service \
   -n 30 \
   --no-pager
 ```
@@ -169,7 +169,7 @@ Restaurer Django :
 ```bash
 ./infrastructure/scripts/restore-database.sh \
   django \
-  /var/backups/le-bon-prenom/django_DATE_HEURE.dump
+  /var/backups/mentor-ia/django_DATE_HEURE.dump
 ```
 
 Restaurer Keycloak :
@@ -177,7 +177,7 @@ Restaurer Keycloak :
 ```bash
 ./infrastructure/scripts/restore-database.sh \
   keycloak \
-  /var/backups/le-bon-prenom/keycloak_DATE_HEURE.dump
+  /var/backups/mentor-ia/keycloak_DATE_HEURE.dump
 ```
 
 Avant la restauration, le script :

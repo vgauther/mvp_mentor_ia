@@ -9,7 +9,7 @@ INFRASTRUCTURE_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 COMPOSE_FILE="${INFRASTRUCTURE_DIR}/compose.yml"
 ENV_FILE="${INFRASTRUCTURE_DIR}/.env"
 
-BACKUP_DIR="${BACKUP_DIR:-/var/backups/le-bon-prenom}"
+BACKUP_DIR="${BACKUP_DIR:-/var/backups/mentor-ia}"
 RETENTION_DAYS="${RETENTION_DAYS:-30}"
 TIMESTAMP="$(date +'%Y-%m-%d_%H%M%S')"
 

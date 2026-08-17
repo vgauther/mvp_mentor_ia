@@ -71,16 +71,21 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": env("POSTGRES_DB"),
-        "USER": env("POSTGRES_USER"),
-        "PASSWORD": env("POSTGRES_PASSWORD"),
-        "HOST": env("POSTGRES_HOST"),
-        "PORT": env.int("POSTGRES_PORT"),
+database_url = env("DATABASE_URL", default="")
+
+if database_url:
+    DATABASES = {"default": env.db_url_config(database_url)}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": env("POSTGRES_DB"),
+            "USER": env("POSTGRES_USER"),
+            "PASSWORD": env("POSTGRES_PASSWORD"),
+            "HOST": env("POSTGRES_HOST"),
+            "PORT": env.int("POSTGRES_PORT"),
+        }
     }
-}
 
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -121,6 +126,22 @@ USE_TZ = True
 
 
 STATIC_URL = "static/"
+
+MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_URL = "/media/"
+
+# Les vidéos sont envoyées en streaming sur disque au-delà du seuil mémoire
+# standard de Django. La limite fonctionnelle du MVP est fixée à 500 Mo.
+RAW_UPLOAD_MAX_SIZE = 500 * 1024 * 1024
+
+# L’enrichissement est optionnel tant qu’aucune clé n’est fournie. Les données
+# dérivées sont toujours stockées séparément des fichiers sources.
+OPENAI_API_KEY = env("OPENAI_API_KEY", default="")
+OPENAI_TEXT_MODEL = env("OPENAI_TEXT_MODEL", default="gpt-5.4-mini")
+OPENAI_TRANSCRIPTION_MODEL = env(
+    "OPENAI_TRANSCRIPTION_MODEL",
+    default="gpt-transcribe",
+)
 
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

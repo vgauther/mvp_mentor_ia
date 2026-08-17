@@ -1,0 +1,13 @@
+[Unit]
+Description=Sauvegarde des bases PostgreSQL Mentor IA
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+User=mentor-ia
+Group=mentor-ia
+WorkingDirectory=/opt/mentor-ia
+ExecStart=/opt/mentor-ia/infrastructure/scripts/backup-databases.sh
+UMask=0077
+TimeoutStartSec=30min

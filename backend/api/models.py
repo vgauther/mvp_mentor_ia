@@ -1,10 +1,19 @@
-from django.db import models
-from django.db.models.functions import Lower
+from pathlib import Path
+from uuid import uuid4
 
-from .first_name_origins import FIRST_NAME_ORIGIN_CHOICES
+from django.core.exceptions import ValidationError
+from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 
 
 class Profile(models.Model):
+    """Projection locale minimale d'un utilisateur Keycloak."""
+
+    class Role(models.TextChoices):
+        ADMIN = "admin", "Administrateur"
+        LEARNER = "learner", "Apprenant"
+
     keycloak_id = models.CharField(
         max_length=255,
         unique=True,
@@ -20,6 +29,12 @@ class Profile(models.Model):
         max_length=150,
         blank=True,
     )
+    role = models.CharField(
+        max_length=10,
+        choices=Role.choices,
+        default=Role.LEARNER,
+        db_index=True,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -27,199 +42,301 @@ class Profile(models.Model):
         return self.display_name or self.username
 
 
-class FirstName(models.Model):
-    class Gender(models.TextChoices):
-        FEMALE = "female", "Féminin"
-        MALE = "male", "Masculin"
-        MIXED = "mixed", "Mixte"
+class Training(models.Model):
+    """Formation en cours de préparation par un administrateur."""
 
-    name = models.CharField(max_length=100)
-    gender = models.CharField(
-        max_length=10,
-        choices=Gender.choices,
-        db_index=True,
-    )
-    origin = models.CharField(
-        max_length=150,
-        choices=FIRST_NAME_ORIGIN_CHOICES,
-        blank=True,
-        db_index=True,
-    )
-    meaning = models.TextField(blank=True)
-    is_active = models.BooleanField(
-        default=True,
-        db_index=True,
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ("name",)
-        verbose_name = "prénom"
-        verbose_name_plural = "prénoms"
-        constraints = [
-            models.UniqueConstraint(
-                Lower("name"),
-                name="unique_first_name_case_insensitive",
-            ),
-        ]
-
-    def __str__(self) -> str:
-        return self.name
-
-
-def default_search_genders():
-    return [
-        FirstName.Gender.FEMALE,
-        FirstName.Gender.MALE,
-        FirstName.Gender.MIXED,
-    ]
-
-
-class NameSearch(models.Model):
     class Status(models.TextChoices):
-        ACTIVE = "active", "Active"
-        COMPLETED = "completed", "Terminée"
-        ARCHIVED = "archived", "Archivée"
+        DRAFT = "draft", "Brouillon"
+        STRUCTURING = "structuring", "En structuration"
+        READY = "ready", "Prête"
 
-    creator = models.ForeignKey(
-        Profile,
-        on_delete=models.CASCADE,
-        related_name="name_searches",
-    )
-    title = models.CharField(max_length=150)
-    genders = models.JSONField(default=default_search_genders)
-    origins = models.JSONField(default=list)
-    min_length = models.PositiveSmallIntegerField(
-        null=True,
-        blank=True,
-    )
-    max_length = models.PositiveSmallIntegerField(
-        null=True,
-        blank=True,
-    )
-    first_letters = models.JSONField(default=list)
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
     status = models.CharField(
-        max_length=10,
+        max_length=20,
         choices=Status.choices,
-        default=Status.ACTIVE,
+        default=Status.DRAFT,
         db_index=True,
+    )
+    created_by = models.ForeignKey(
+        Profile,
+        on_delete=models.PROTECT,
+        related_name="created_trainings",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ("-created_at",)
-        verbose_name = "recherche de prénoms"
-        verbose_name_plural = "recherches de prénoms"
-        indexes = [
-            models.Index(
-                fields=("creator", "status"),
-                name="search_creator_status_idx",
-            ),
-        ]
+        ordering = ("-updated_at", "-id")
 
     def __str__(self) -> str:
         return self.title
 
 
-class NameSearchParticipant(models.Model):
-    class Role(models.TextChoices):
-        OWNER = "owner", "Propriétaire"
-        MEMBER = "member", "Participant"
+class TrainingAssignment(models.Model):
+    """Affectation d'une formation à un utilisateur."""
 
-    class InvitationStatus(models.TextChoices):
-        PENDING = "pending", "En attente"
-        ACCEPTED = "accepted", "Acceptée"
-        DECLINED = "declined", "Refusée"
-
-    search = models.ForeignKey(
-        NameSearch,
-        on_delete=models.CASCADE,
-        related_name="participants",
-    )
     profile = models.ForeignKey(
         Profile,
         on_delete=models.CASCADE,
-        related_name="search_participations",
+        related_name="training_assignments",
     )
-    role = models.CharField(
-        max_length=10,
-        choices=Role.choices,
-        default=Role.MEMBER,
+    training = models.ForeignKey(
+        Training,
+        on_delete=models.CASCADE,
+        related_name="user_assignments",
     )
-    invitation_status = models.CharField(
-        max_length=10,
-        choices=InvitationStatus.choices,
-        default=InvitationStatus.PENDING,
-        db_index=True,
+    assigned_by = models.ForeignKey(
+        Profile,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="created_training_assignments",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("created_at", "id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("profile", "training"),
+                name="unique_profile_training_assignment",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.profile} · {self.training}"
+
+
+class LearningObjective(models.Model):
+    """Compétence ou capacité que la formation doit faire acquérir."""
+
+    training = models.ForeignKey(
+        Training,
+        on_delete=models.CASCADE,
+        related_name="objectives",
+    )
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    position = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("position", "id")
+
+    def __str__(self) -> str:
+        return self.title
+
+
+class CourseUnit(models.Model):
+    """Élément de structure : module, chapitre ou section."""
+
+    class Kind(models.TextChoices):
+        MODULE = "module", "Module"
+        CHAPTER = "chapter", "Chapitre"
+        SECTION = "section", "Section"
+
+    training = models.ForeignKey(
+        Training,
+        on_delete=models.CASCADE,
+        related_name="units",
+    )
+    parent = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="children",
+    )
+    kind = models.CharField(max_length=10, choices=Kind.choices)
+    working_title = models.CharField(max_length=255)
+    notes = models.TextField(blank=True)
+    position = models.PositiveIntegerField(default=0)
+    objectives = models.ManyToManyField(
+        LearningObjective,
+        blank=True,
+        related_name="course_units",
+    )
+    raw_materials = models.ManyToManyField(
+        "RawMaterial",
+        blank=True,
+        related_name="course_units",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ("created_at",)
-        verbose_name = "participant à une recherche"
-        verbose_name_plural = "participants aux recherches"
-        constraints = [
-            models.UniqueConstraint(
-                fields=("search", "profile"),
-                name="unique_search_participant",
-            ),
-        ]
-        indexes = [
-            models.Index(
-                fields=("profile", "invitation_status"),
-                name="participant_invite_status_idx",
-            ),
-        ]
+        ordering = ("position", "id")
+
+    def clean(self):
+        super().clean()
+
+        if self.kind == self.Kind.MODULE and self.parent_id:
+            raise ValidationError({"parent": "Un module ne peut pas avoir de parent."})
+
+        if self.kind == self.Kind.CHAPTER:
+            if not self.parent_id or self.parent.kind != self.Kind.MODULE:
+                raise ValidationError(
+                    {"parent": "Un chapitre doit appartenir à un module."}
+                )
+
+        if self.kind == self.Kind.SECTION:
+            if not self.parent_id or self.parent.kind != self.Kind.CHAPTER:
+                raise ValidationError(
+                    {"parent": "Une section doit appartenir à un chapitre."}
+                )
+
+        if self.parent_id and self.parent.training_id != self.training_id:
+            raise ValidationError(
+                {"parent": "Le parent doit appartenir à la même formation."}
+            )
 
     def __str__(self) -> str:
-        return f"{self.profile} — {self.search}"
+        return self.working_title
 
 
-class NameDecision(models.Model):
-    class Choice(models.TextChoices):
-        LIKED = "liked", "Aimé"
-        REJECTED = "rejected", "Refusé"
+def raw_material_upload_to(instance, filename: str) -> str:
+    suffix = Path(filename).suffix.lower()[:12]
+    return f"raw-data/training-{instance.training_id}/{uuid4().hex}{suffix}"
 
-    participant = models.ForeignKey(
-        NameSearchParticipant,
+
+class RawMaterial(models.Model):
+    """Donnée source non transformée qui alimentera la génération future."""
+
+    class Kind(models.TextChoices):
+        VIDEO = "video", "Vidéo"
+        PDF = "pdf", "PDF"
+        TEXT = "text", "Texte"
+        QUIZ = "quiz", "Quiz"
+
+    training = models.ForeignKey(
+        Training,
         on_delete=models.CASCADE,
-        related_name="decisions",
+        related_name="raw_materials",
     )
-    first_name = models.ForeignKey(
-        FirstName,
+    kind = models.CharField(max_length=10, choices=Kind.choices, db_index=True)
+    file = models.FileField(upload_to=raw_material_upload_to, blank=True)
+    content = models.TextField(blank=True)
+    quiz_data = models.JSONField(default=dict, blank=True)
+    original_filename = models.CharField(max_length=255, blank=True)
+    mime_type = models.CharField(max_length=150, blank=True)
+    size = models.PositiveBigIntegerField(default=0)
+    created_by = models.ForeignKey(
+        Profile,
+        on_delete=models.PROTECT,
+        related_name="uploaded_raw_materials",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+
+    @property
+    def display_name(self) -> str:
+        if self.kind == self.Kind.QUIZ:
+            title = str(self.quiz_data.get("title", "")).strip()
+            if title:
+                return title[:80]
+            question_count = len(self.quiz_data.get("questions", []))
+            suffix = "question" if question_count == 1 else "questions"
+            return f"Quiz · {question_count} {suffix}"
+        if self.original_filename:
+            return self.original_filename
+        if self.content:
+            first_line = self.content.strip().splitlines()[0]
+            return first_line[:80]
+        return self.get_kind_display()
+
+    def __str__(self) -> str:
+        return self.display_name
+
+
+class RawMaterialEnrichment(models.Model):
+    """Contenu dérivé par IA sans altérer la donnée source associée."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "À enrichir"
+        QUEUED = "queued", "En attente"
+        PROCESSING = "processing", "En cours"
+        READY = "ready", "Prête"
+        ERROR = "error", "Erreur"
+
+    material = models.OneToOneField(
+        RawMaterial,
         on_delete=models.CASCADE,
-        related_name="decisions",
+        related_name="enrichment",
     )
-    choice = models.CharField(
-        max_length=8,
-        choices=Choice.choices,
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
         db_index=True,
+    )
+    progress_message = models.CharField(max_length=255, blank=True)
+    transcript = models.TextField(blank=True)
+    extracted_text = models.TextField(blank=True)
+    media_purpose = models.TextField(blank=True)
+    summary = models.TextField(blank=True)
+    language = models.CharField(max_length=20, blank=True)
+    key_concepts = models.JSONField(default=list, blank=True)
+    glossary = models.JSONField(default=list, blank=True)
+    keywords = models.JSONField(default=list, blank=True)
+    ai_model = models.CharField(max_length=100, blank=True)
+    error_message = models.TextField(blank=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    generated_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return f"{self.material.display_name} · {self.get_status_display()}"
+
+
+class CourseStructureGeneration(models.Model):
+    """Brouillon de structure produit par IA et conservé avant validation."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "À générer"
+        QUEUED = "queued", "En attente"
+        PROCESSING = "processing", "En cours"
+        READY = "ready", "Proposition prête"
+        ERROR = "error", "Erreur"
+
+    training = models.OneToOneField(
+        Training,
+        on_delete=models.CASCADE,
+        related_name="structure_generation",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True,
+    )
+    progress_message = models.CharField(max_length=255, blank=True)
+    structure = models.JSONField(default=dict, blank=True)
+    ai_model = models.CharField(max_length=100, blank=True)
+    error_message = models.TextField(blank=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    generated_at = models.DateTimeField(null=True, blank=True)
+    published_at = models.DateTimeField(null=True, blank=True)
+    published_by = models.ForeignKey(
+        Profile,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="published_course_structures",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    class Meta:
-        ordering = ("-updated_at",)
-        verbose_name = "décision sur un prénom"
-        verbose_name_plural = "décisions sur les prénoms"
-        constraints = [
-            models.UniqueConstraint(
-                fields=("participant", "first_name"),
-                name="unique_participant_first_name",
-            ),
-        ]
-        indexes = [
-            models.Index(
-                fields=("participant", "choice"),
-                name="decision_part_choice_idx",
-            ),
-        ]
-
     def __str__(self) -> str:
-        return (
-            f"{self.participant.profile} — "
-            f"{self.first_name}: {self.get_choice_display()}"
-        )
+        return f"{self.training.title} · {self.get_status_display()}"
+
+
+@receiver(post_delete, sender=RawMaterial)
+def delete_raw_material_file(sender, instance, **kwargs):
+    """Supprime également le fichier lorsqu'une source est supprimée."""
+
+    if instance.file:
+        instance.file.delete(save=False)

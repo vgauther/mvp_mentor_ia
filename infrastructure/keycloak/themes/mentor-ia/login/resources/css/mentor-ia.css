@@ -1,0 +1,144 @@
+:root {
+  --mentor-blue: #0179fa;
+  --mentor-blue-dark: #0064d4;
+  --mentor-navy: #071534;
+  --mentor-muted: #687386;
+  --mentor-line: #e3e9f1;
+}
+
+body,
+.login-pf body {
+  min-height: 100vh;
+  color: var(--mentor-navy);
+  background:
+    radial-gradient(circle at 85% 12%, rgba(1, 121, 250, 0.1), transparent 30rem),
+    #f7f9fc;
+  font-family: Inter, Arial, sans-serif;
+}
+
+.login-pf-page {
+  padding-top: 7vh;
+}
+
+#kc-header {
+  margin-bottom: 28px;
+  color: var(--mentor-navy);
+}
+
+#kc-header-wrapper {
+  font-size: 0;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  text-transform: none;
+}
+
+#kc-header-wrapper::before {
+  display: inline-grid;
+  width: 42px;
+  height: 42px;
+  margin-right: 12px;
+  place-items: center;
+  border-radius: 13px;
+  color: #fff;
+  background: var(--mentor-blue);
+  box-shadow: 0 10px 24px rgba(1, 121, 250, 0.23);
+  content: "M";
+  font-size: 22px;
+  vertical-align: middle;
+}
+
+#kc-header-wrapper::after {
+  content: "Mentor IA";
+  font-size: 25px;
+  vertical-align: middle;
+}
+
+.card-pf,
+.pf-v5-c-login__main,
+.pf-v5-c-card {
+  overflow: hidden;
+  border: 1px solid var(--mentor-line);
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 28px 70px rgba(32, 62, 98, 0.11);
+}
+
+.card-pf {
+  padding: 36px 40px 40px;
+}
+
+#kc-page-title,
+.pf-v5-c-title {
+  color: var(--mentor-navy);
+  font-weight: 760;
+  letter-spacing: -0.035em;
+}
+
+label,
+.pf-v5-c-form__label-text {
+  color: #39465a;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.form-control,
+.pf-v5-c-form-control {
+  min-height: 46px;
+  border: 1px solid #d9e1eb;
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.form-control:focus,
+.pf-v5-c-form-control:focus-within {
+  border-color: #75b7ff;
+  box-shadow: 0 0 0 3px rgba(1, 121, 250, 0.1);
+}
+
+.btn-primary,
+.pf-v5-c-button.pf-m-primary {
+  min-height: 46px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--mentor-blue);
+  box-shadow: 0 12px 25px rgba(1, 121, 250, 0.22);
+  font-weight: 700;
+}
+
+.btn-primary:hover,
+.btn-primary:focus,
+.pf-v5-c-button.pf-m-primary:hover,
+.pf-v5-c-button.pf-m-primary:focus {
+  background: var(--mentor-blue-dark);
+}
+
+a,
+#kc-registration a,
+.pf-v5-c-login__main-footer-links-item-link {
+  color: var(--mentor-blue);
+  font-weight: 650;
+}
+
+#kc-registration,
+#kc-info-wrapper,
+.pf-v5-c-login__main-footer-band {
+  color: var(--mentor-muted);
+  background: #f7faff;
+}
+
+.alert-error,
+.pf-v5-c-alert.pf-m-danger {
+  border-color: #ffc9ce;
+  color: #a61f2d;
+  background: #fff2f3;
+}
+
+@media (max-width: 600px) {
+  .login-pf-page {
+    padding: 24px 16px;
+  }
+
+  .card-pf {
+    padding: 28px 22px 32px;
+  }
+}

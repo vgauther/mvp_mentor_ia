@@ -14,7 +14,7 @@ COPY . .
 
 RUN addgroup --system django \
     && adduser --system --ingroup django --home /home/django django \
-    && mkdir -p /home/django \
+    && mkdir -p /home/django /app/media \
     && chown -R django:django /app /home/django
 
 ENV HOME=/home/django

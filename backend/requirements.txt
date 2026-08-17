@@ -12,3 +12,7 @@ PyJWT==2.13.0
 sqlparse==0.5.5
 tzdata==2026.3
 gunicorn==26.0.0
+PyMuPDF==1.28.0
+imageio-ffmpeg==0.6.0
+openai==2.46.0
+pydantic==2.13.4

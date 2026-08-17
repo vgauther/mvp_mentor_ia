@@ -1,0 +1,10 @@
+[Unit]
+Description=Sauvegarde quotidienne Mentor IA
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 Europe/Paris
+Persistent=true
+Unit=mentor-ia-backup.service
+
+[Install]
+WantedBy=timers.target

@@ -1,20 +1,18 @@
+name: mvp-ia
+
 services:
   postgres:
     image: postgres:17.10
-    container_name: le-bon-prenom-postgres
+    container_name: mvp-ia-postgres
     restart: unless-stopped
-
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-
     ports:
-      - "127.0.0.1:5432:5432"
-
+      - "127.0.0.1:5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-
     healthcheck:
       test:
         [
@@ -27,17 +25,14 @@ services:
 
   keycloak-postgres:
     image: postgres:17.10
-    container_name: le-bon-prenom-keycloak-postgres
+    container_name: mvp-ia-keycloak-postgres
     restart: unless-stopped
-
     environment:
       POSTGRES_DB: ${KEYCLOAK_POSTGRES_DB}
       POSTGRES_USER: ${KEYCLOAK_POSTGRES_USER}
       POSTGRES_PASSWORD: ${KEYCLOAK_POSTGRES_PASSWORD}
-
     volumes:
       - keycloak_postgres_data:/var/lib/postgresql/data
-
     healthcheck:
       test:
         [
@@ -50,10 +45,9 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.7.0
-    container_name: le-bon-prenom-keycloak
+    container_name: mvp-ia-keycloak
     restart: unless-stopped
-    command: start --import-realm
-
+    command: start-dev --import-realm
     environment:
       KC_DB: postgres
       KC_DB_URL_HOST: keycloak-postgres
@@ -61,48 +55,49 @@ services:
       KC_DB_URL_DATABASE: ${KEYCLOAK_POSTGRES_DB}
       KC_DB_USERNAME: ${KEYCLOAK_POSTGRES_USER}
       KC_DB_PASSWORD: ${KEYCLOAK_POSTGRES_PASSWORD}
-
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
-      KC_HOSTNAME: ${KEYCLOAK_HOSTNAME}
-      KC_HTTP_ENABLED: "true"
-      KC_PROXY_HEADERS: xforwarded
-
     ports:
-      - "127.0.0.1:8080:8080"
-
+      - "127.0.0.1:8081:8080"
     volumes:
       - ./keycloak/import:/opt/keycloak/data/import:ro
       - ./keycloak/themes:/opt/keycloak/themes:ro
-
     depends_on:
       keycloak-postgres:
         condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
 
   backend:
     build:
       context: ../backend
-    container_name: le-bon-prenom-backend
+    container_name: mvp-ia-backend
     restart: unless-stopped
-
     environment:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
       DJANGO_DEBUG: ${DJANGO_DEBUG}
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS}
-
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
       DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS}
-
       KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER}
       KEYCLOAK_JWKS_URL: ${KEYCLOAK_JWKS_URL}
       KEYCLOAK_AUDIENCE: ${KEYCLOAK_AUDIENCE}
-
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_TEXT_MODEL: ${OPENAI_TEXT_MODEL:-gpt-5.4-mini}
+      OPENAI_TRANSCRIPTION_MODEL: ${OPENAI_TRANSCRIPTION_MODEL:-gpt-transcribe}
     command: >
       sh -c "python manage.py migrate --noinput &&
       exec gunicorn config.wsgi:application
@@ -111,15 +106,24 @@ services:
       --timeout 60
       --access-logfile -
       --error-logfile -"
-
     ports:
-      - "127.0.0.1:8000:8000"
-
+      - "127.0.0.1:8001:8000"
+    volumes:
+      - backend_media:/app/media
     depends_on:
       postgres:
         condition: service_healthy
       keycloak:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health/')\""
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   frontend:
     build:
@@ -129,19 +133,15 @@ services:
         VITE_KEYCLOAK_REALM: ${VITE_KEYCLOAK_REALM}
         VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID}
         VITE_API_URL: ${VITE_API_URL}
-
-    container_name: le-bon-prenom-frontend
+    container_name: mvp-ia-frontend
     restart: unless-stopped
-
     ports:
-      - "127.0.0.1:5173:80"
-
+      - "127.0.0.1:5174:80"
     depends_on:
       backend:
-        condition: service_started
+        condition: service_healthy
       keycloak:
-        condition: service_started
-
+        condition: service_healthy
     healthcheck:
       test:
         [
@@ -152,7 +152,7 @@ services:
       timeout: 5s
       retries: 5
 
-
 volumes:
   postgres_data:
   keycloak_postgres_data:
+  backend_media:

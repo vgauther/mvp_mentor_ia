@@ -1,5 +1,5 @@
 {
-  "name": "frontend",
+  "name": "mentor-ia-frontend",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -17,7 +17,6 @@
     "format": "prettier --write --experimental-cli src/"
   },
   "dependencies": {
-    "feather-icons": "^4.29.2",
     "keycloak-js": "^26.2.4",
     "pinia": "^4.0.2",
     "vue": "^3.5.40",
