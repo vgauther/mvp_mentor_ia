@@ -1,7 +1,7 @@
 # Mentor IA - MVP
 
 Squelette technique du MVP décrit dans le cahier des charges **MVP Mentor IA**.
-La structure reprend l'architecture du tag `v3.0.0` du projet d'origine :
+Le projet repose sur :
 
 - API Python avec Django et Django REST Framework ;
 - authentification OpenID Connect avec Keycloak ;
@@ -16,8 +16,7 @@ de parcours à examiner. Le Trigger Master et HeyGen restent hors de cette
 étape.
 
 Dans Docker Desktop, les services sont regroupés sous le projet Compose
-`mvp-ia` et tous les conteneurs utilisent le préfixe `mvp-ia-` afin de les
-distinguer de ceux du projet Le Bon Prénom.
+`mvp-ia` et tous les conteneurs utilisent le préfixe `mvp-ia-`.
 
 ## Arborescence
 
@@ -48,9 +47,8 @@ Services disponibles :
 | Keycloak | http://localhost:8081 |
 | Administration Keycloak | http://localhost:8081/admin/ |
 
-Les ports hôtes du MVP sont volontairement différents de ceux du projet Le Bon
-Prénom : `5433`, `8081`, `8001` et `5174`. Les deux stacks peuvent ainsi être
-démarrées en même temps sans collision de ports, de noms ou de volumes.
+Les ports hôtes du MVP sont `5433`, `8081`, `8001` et `5174` afin d'éviter les
+collisions courantes avec d'autres services locaux.
 
 Les identifiants de l'administrateur Keycloak sont définis dans
 `infrastructure/.env`. Le realm `mentor-ia` est importé automatiquement au
